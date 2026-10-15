@@ -482,6 +482,8 @@ function syncIncomeForm() {
   $$(".income-kind").forEach((btn) => {
     btn.classList.toggle("is-active", btn.dataset.income === incomingKind);
   });
+  const kindSelect = $("#incomeKindSelect");
+  if (kindSelect) kindSelect.value = incomingKind;
 }
 
 function renderTobacco() {
@@ -678,11 +680,18 @@ $("#addBrandForm").addEventListener("submit", (e) => {
   e.target.reset();
 });
 
+function setIncomingKind(kind) {
+  if (!INCOME[kind]) return;
+  incomingKind = kind;
+  renderTobacco();
+}
+
 $$(".income-kind").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    incomingKind = btn.dataset.income;
-    renderTobacco();
-  });
+  btn.addEventListener("click", () => setIncomingKind(btn.dataset.income));
+});
+
+$("#incomeKindSelect").addEventListener("change", (e) => {
+  setIncomingKind(e.target.value);
 });
 
 $("#tobaccoForm").addEventListener("submit", (e) => {
@@ -690,7 +699,7 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   const data = Object.fromEntries(new FormData(e.target));
   state.tobacco.push({
     id: uid(),
-    kind: incomingKind,
+    kind: data.kind || incomingKind,
     date: data.date,
     product: data.product.trim(),
     supplier: data.supplier.trim(),

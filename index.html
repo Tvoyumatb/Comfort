@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1a1510">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <header class="topbar no-print">
@@ -65,7 +65,9 @@
     <section id="revision" class="panel" role="tabpanel" hidden>
       <div class="card sheet">
         <label class="sheet-date">Число снятия
-          <input type="date" id="revisionDate">
+          <span class="date-wrap">
+            <input type="date" id="revisionDate">
+          </span>
         </label>
         <div class="sheet-caption">Название табака — в граммах</div>
         <div id="revisionRows"></div>
@@ -103,8 +105,17 @@
 
       <form class="card form" id="tobaccoForm">
         <h2>Новый приход</h2>
+        <label>Тип
+          <select name="kind" id="incomeKindSelect">
+            <option value="tobacco">Табак</option>
+            <option value="inventory">Инвентарь</option>
+            <option value="coal">Уголь</option>
+          </select>
+        </label>
         <label>Дата
-          <input type="date" name="date" required>
+          <span class="date-wrap">
+            <input type="date" name="date" required>
+          </span>
         </label>
         <label><span id="productLabelText">Марка</span>
           <input type="text" name="product" list="productsList" placeholder="Например Starline" required>
@@ -148,6 +159,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
