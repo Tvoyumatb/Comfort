@@ -1,12 +1,13 @@
-const CACHE = "journal-v5";
+const CACHE = "journal-v7";
 const FILES = [
   "./",
   "./index.html",
-  "./style.css?v=6",
-  "./app.js?v=6",
+  "./style.css?v=7",
+  "./app.js?v=7",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
+  "./wallpaper-tangiers.webp",
 ];
 
 self.addEventListener("install", (event) => {

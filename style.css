@@ -41,6 +41,29 @@ body {
   overflow-x: hidden;
 }
 
+.app-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #1a1510 url("wallpaper-tangiers.webp") center/cover no-repeat;
+}
+
+.app-wallpaper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(26, 21, 16, 0.62), rgba(26, 21, 16, 0.82));
+}
+
+body[data-venue="shishka"] .app-wallpaper::after {
+  background: linear-gradient(180deg, rgba(18, 20, 26, 0.68), rgba(18, 20, 26, 0.86));
+}
+
+.topbar, .venues, .tabs, main {
+  position: relative;
+  z-index: 1;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;
@@ -703,7 +726,7 @@ input[type="number"] {
 }
 
 @media print {
-  .tabs, #tobaccoForm, .add-brand, .icon-btn, .ghost, .danger, .hint, .emp-remove, .no-print, .venues {
+  .tabs, #tobaccoForm, .add-brand, .icon-btn, .ghost, .danger, .hint, .emp-remove, .no-print, .venues, .app-wallpaper {
     display: none !important;
   }
 
