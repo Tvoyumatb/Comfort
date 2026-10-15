@@ -38,6 +38,7 @@ html, body {
 
 body {
   padding-bottom: max(24px, env(safe-area-inset-bottom));
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -89,7 +90,7 @@ h1 {
 .income-kinds {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 12px;
 }
 
@@ -98,10 +99,12 @@ h1 {
   cursor: pointer;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 10px 8px;
+  padding: 12px 4px;
   background: var(--bg-2);
   color: var(--muted);
   font-weight: 700;
+  font-size: 13px;
+  min-height: 44px;
 }
 
 .income-kind.is-active {
@@ -245,6 +248,8 @@ label {
 
 input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 6px;
   padding: 12px;
   border: 1px solid var(--line);
@@ -253,6 +258,13 @@ input {
   color: var(--text);
   font: inherit;
   font-size: 16px;
+}
+
+input[type="date"],
+input[type="time"],
+input[type="number"] {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .row {
@@ -288,10 +300,9 @@ input {
 }
 
 .sheet-date {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
   margin: 0;
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
@@ -301,8 +312,8 @@ input {
 }
 
 .sheet-date input {
-  width: auto;
-  max-width: 160px;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   background: #143d28;
   border-color: #2f7a54;
