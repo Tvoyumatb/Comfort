@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1510">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Отчёты: смены и табак</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar no-print">
+    <div>
+      <p class="eyebrow" id="venueEyebrow">Журнал точки</p>
+      <h1 id="periodTitle">Отчёт за 2 недели</h1>
+    </div>
+    <button type="button" class="ghost" id="printBtn">Печать</button>
+  </header>
+
+  <nav class="venues no-print" role="tablist" aria-label="Заведение">
+    <button type="button" class="venue is-active" data-venue="tangiers">Tangiers</button>
+    <button type="button" class="venue" data-venue="shishka">Shishka Premium</button>
+  </nav>
+
+  <nav class="tabs tabs-4 no-print" role="tablist">
+    <button type="button" class="tab is-active" data-tab="shifts" role="tab" aria-selected="true">Табель</button>
+    <button type="button" class="tab" data-tab="revision" role="tab" aria-selected="false">Ревизия</button>
+    <button type="button" class="tab" data-tab="tobacco" role="tab" aria-selected="false">Приход</button>
+    <button type="button" class="tab" data-tab="checklist" role="tab" aria-selected="false">Лист</button>
+  </nav>
+
+  <main>
+    <section id="shifts" class="panel is-active" role="tabpanel">
+      <div class="period-bar">
+        <button type="button" class="icon-btn" id="prevPeriod" aria-label="Предыдущие 2 недели">‹</button>
+        <div class="period-label">
+          <strong id="periodRange">—</strong>
+          <span id="periodHint">Нажмите на клетку, чтобы поставить смену</span>
+        </div>
+        <button type="button" class="icon-btn" id="nextPeriod" aria-label="Следующие 2 недели">›</button>
+      </div>
+
+      <div class="legend">
+        <span class="chip morning">Утро с 11:30</span>
+        <span class="chip evening-wd">Вечер будни с 18:00</span>
+        <span class="chip evening-we">Вечер выходные 250 000</span>
+        <span class="chip intern">Стажировка</span>
+      </div>
+
+      <div class="rates" id="ratesBox"></div>
+
+      <div class="excel-card">
+        <div class="roster-wrap" id="rosterWrap"></div>
+      </div>
+
+      <form class="add-brand" id="addEmployeeForm">
+        <input type="text" name="name" placeholder="Добавить сотрудника" required>
+        <button type="submit" class="primary compact">+</button>
+      </form>
+
+      <h2 class="block-title">Расчёт за период</h2>
+      <div class="excel-card pay-wrap" id="payWrap"></div>
+    </section>
+
+    <section id="revision" class="panel" role="tabpanel" hidden>
+      <div class="card sheet">
+        <label class="sheet-date">Число снятия
+          <input type="date" id="revisionDate">
+        </label>
+        <div class="sheet-caption">Название табака — в граммах</div>
+        <div id="revisionRows"></div>
+        <form class="add-brand" id="addBrandForm">
+          <input type="text" name="name" placeholder="Добавить марку" required>
+          <button type="submit" class="primary compact">+</button>
+        </form>
+        <div class="sheet-row total">
+          <span>Общее кол-во</span>
+          <strong id="revisionTotal">0</strong>
+        </div>
+        <label class="sheet-row coals">
+          <span>Угли</span>
+          <input type="number" id="coalsInput" min="0" step="1" inputmode="numeric">
+        </label>
+      </div>
+      <p class="hint">Ревизия сохраняется сама. Можно вести отдельный лист на каждую дату снятия.</p>
+    </section>
+
+    <section id="tobacco" class="panel" role="tabpanel" hidden>
+      <div class="period-bar">
+        <p class="period-label">
+          <strong>Приход табака</strong>
+          <span>Поступления в граммах</span>
+        </p>
+      </div>
+
+      <div class="stats" id="tobaccoStats"></div>
+
+      <form class="card form" id="tobaccoForm">
+        <h2>Новый приход</h2>
+        <label>Дата
+          <input type="date" name="date" required>
+        </label>
+        <label>Марка
+          <input type="text" name="product" list="productsList" placeholder="Например Starline" required>
+        </label>
+        <datalist id="productsList"></datalist>
+        <label>Поставщик
+          <input type="text" name="supplier" list="suppliersList" placeholder="Поставщик">
+        </label>
+        <datalist id="suppliersList"></datalist>
+        <div class="row">
+          <label>Граммы
+            <input type="number" name="qty" min="1" step="1" required>
+          </label>
+          <label>Сумма, ₽
+            <input type="number" name="sum" min="0" step="0.01" placeholder="0">
+          </label>
+        </div>
+        <label>Накладная / комментарий
+          <input type="text" name="note" placeholder="Номер документа">
+        </label>
+        <button type="submit" class="primary">Записать приход</button>
+      </form>
+
+      <div class="list" id="tobaccoList"></div>
+    </section>
+
+    <section id="checklist" class="panel" role="tabpanel" hidden>
+      <div class="checklist-editor no-print">
+        <p class="hint">Пункты этого листа только для текущего заведения. Лишние строки можно удалить, например Tangiers в Shishka Premium.</p>
+        <label>Копий на A4
+          <input type="number" id="copiesInput" min="1" max="80" step="1">
+        </label>
+        <h2 class="block-title">Строки на листке</h2>
+        <div id="checklistItems"></div>
+        <form class="add-brand" id="addChecklistItemForm">
+          <input type="text" name="name" placeholder="Добавить строку" required>
+          <button type="submit" class="primary compact">+</button>
+        </form>
+      </div>
+      <div class="a4-page" id="checklistPrint"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
