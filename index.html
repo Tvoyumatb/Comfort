@@ -86,10 +86,16 @@
     </section>
 
     <section id="tobacco" class="panel" role="tabpanel" hidden>
+      <div class="income-kinds" role="tablist" aria-label="Тип прихода">
+        <button type="button" class="income-kind is-active" data-income="tobacco">Табак</button>
+        <button type="button" class="income-kind" data-income="inventory">Инвентарь</button>
+        <button type="button" class="income-kind" data-income="coal">Уголь</button>
+      </div>
+
       <div class="period-bar">
         <p class="period-label">
-          <strong>Приход табака</strong>
-          <span>Поступления в граммах</span>
+          <strong id="incomeTitle">Приход табака</strong>
+          <span id="incomeHint">Поступления в граммах</span>
         </p>
       </div>
 
@@ -100,7 +106,7 @@
         <label>Дата
           <input type="date" name="date" required>
         </label>
-        <label>Марка
+        <label><span id="productLabelText">Марка</span>
           <input type="text" name="product" list="productsList" placeholder="Например Starline" required>
         </label>
         <datalist id="productsList"></datalist>
@@ -109,10 +115,10 @@
         </label>
         <datalist id="suppliersList"></datalist>
         <div class="row">
-          <label>Граммы
+          <label><span id="qtyLabelText">Граммы</span>
             <input type="number" name="qty" min="1" step="1" required>
           </label>
-          <label>Сумма, ₽
+          <label>Сумма
             <input type="number" name="sum" min="0" step="0.01" placeholder="0">
           </label>
         </div>

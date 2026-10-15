@@ -60,10 +60,44 @@ const MONTHS_RU = [
   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 ];
 
+const INCOME = {
+  tobacco: {
+    title: "Приход табака",
+    hint: "Поступления в граммах",
+    name: "Марка",
+    placeholder: "Например Starline",
+    qty: "Граммы",
+    unit: "г",
+    qtyStat: "Граммы",
+    empty: "Прихода табака пока нет",
+  },
+  inventory: {
+    title: "Приход инвентаря",
+    hint: "Чаши, щипцы, шланги и другое",
+    name: "Наименование",
+    placeholder: "Щипцы, чаша, шланг",
+    qty: "Количество, шт",
+    unit: "шт",
+    qtyStat: "Штук",
+    empty: "Прихода инвентаря пока нет",
+  },
+  coal: {
+    title: "Приход угля",
+    hint: "Коробки или килограммы",
+    name: "Наименование",
+    placeholder: "Кокосовый уголь",
+    qty: "Количество",
+    unit: "шт",
+    qtyStat: "Кол-во",
+    empty: "Прихода угля пока нет",
+  },
+};
+
 const db = loadDb();
 let state = db.venues[db.current];
 let viewMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let half = new Date().getDate() > 15 ? 1 : 0;
+let incomingKind = "tobacco";
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -432,21 +466,41 @@ function renderRevision() {
   `).join("");
 }
 
+function incomingRows() {
+  return (state.tobacco || [])
+    .filter((t) => (t.kind || "tobacco") === incomingKind)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function syncIncomeForm() {
+  const meta = INCOME[incomingKind];
+  $("#incomeTitle").textContent = meta.title;
+  $("#incomeHint").textContent = meta.hint;
+  $("#productLabelText").textContent = meta.name;
+  document.querySelector('#tobaccoForm [name="product"]').placeholder = meta.placeholder;
+  $("#qtyLabelText").textContent = meta.qty;
+  $$(".income-kind").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.income === incomingKind);
+  });
+}
+
 function renderTobacco() {
-  const rows = [...state.tobacco].sort((a, b) => b.date.localeCompare(a.date));
+  syncIncomeForm();
+  const meta = INCOME[incomingKind];
+  const rows = incomingRows();
   const qty = rows.reduce((sum, t) => sum + Number(t.qty || 0), 0);
   const sum = rows.reduce((s, t) => s + Number(t.sum || 0), 0);
   const last = rows[0]?.date ? parseISODate(rows[0].date).toLocaleDateString("ru-RU") : "—";
 
   $("#tobaccoStats").innerHTML = `
     <div class="stat"><span>Поступлений</span><b>${rows.length}</b></div>
-    <div class="stat"><span>Граммы</span><b>${formatGrams(qty)}</b></div>
+    <div class="stat"><span>${meta.qtyStat}</span><b>${formatGrams(qty)}</b></div>
     <div class="stat"><span>Сумма</span><b>${formatSum(sum)}</b></div>
     <div class="stat"><span>Последний приход</span><b>${last}</b></div>
   `;
 
   if (!rows.length) {
-    $("#tobaccoList").innerHTML = `<p class="empty">Прихода табака пока нет</p>`;
+    $("#tobaccoList").innerHTML = `<p class="empty">${meta.empty}</p>`;
   } else {
     $("#tobaccoList").innerHTML = rows.map((t) => `
       <article class="card item">
@@ -455,7 +509,7 @@ function renderTobacco() {
           <button type="button" class="danger" data-del-tobacco="${t.id}">Удалить</button>
         </div>
         <p class="meta">
-          ${parseISODate(t.date).toLocaleDateString("ru-RU")} · ${formatGrams(t.qty)} г
+          ${parseISODate(t.date).toLocaleDateString("ru-RU")} · ${formatGrams(t.qty)} ${meta.unit}
           ${t.sum ? ` · ${formatSum(t.sum)}` : ""}
           ${t.supplier ? `<br>${escapeHtml(t.supplier)}` : ""}
           ${t.note ? `<br>${escapeHtml(t.note)}` : ""}
@@ -464,8 +518,10 @@ function renderTobacco() {
     `).join("");
   }
 
-  fillDatalist("#productsList", [...new Set([...DEFAULT_BRANDS, ...unique(state.tobacco, "product")])]);
-  fillDatalist("#suppliersList", unique(state.tobacco, "supplier"));
+  const names = unique(incomingRows(), "product");
+  const extras = incomingKind === "tobacco" ? DEFAULT_BRANDS : [];
+  fillDatalist("#productsList", [...new Set([...extras, ...names])]);
+  fillDatalist("#suppliersList", unique(incomingRows(), "supplier"));
 }
 
 function ensureChecklist() {
@@ -622,11 +678,19 @@ $("#addBrandForm").addEventListener("submit", (e) => {
   e.target.reset();
 });
 
+$$(".income-kind").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    incomingKind = btn.dataset.income;
+    renderTobacco();
+  });
+});
+
 $("#tobaccoForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   state.tobacco.push({
     id: uid(),
+    kind: incomingKind,
     date: data.date,
     product: data.product.trim(),
     supplier: data.supplier.trim(),

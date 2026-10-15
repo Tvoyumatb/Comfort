@@ -86,6 +86,30 @@ h1 {
   border-color: transparent;
 }
 
+.income-kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.income-kind {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 8px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.income-kind.is-active {
+  background: var(--accent);
+  color: #1a1510;
+  border-color: transparent;
+}
+
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
