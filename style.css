@@ -39,29 +39,23 @@ html, body {
 body {
   padding-bottom: max(24px, env(safe-area-inset-bottom));
   overflow-x: hidden;
+  background-color: #070707;
 }
 
-.app-wallpaper {
+body::before {
+  content: "";
   position: fixed;
   inset: 0;
-  z-index: 0;
-  background: #1a1510 url("wallpaper-tangiers.webp") center/cover no-repeat;
+  z-index: -1;
+  background: #000 url("tangiers-logo.png") center 42% / min(92vw, 620px) no-repeat;
+  opacity: 0.42;
+  pointer-events: none;
 }
 
-.app-wallpaper::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(26, 21, 16, 0.62), rgba(26, 21, 16, 0.82));
-}
-
-body[data-venue="shishka"] .app-wallpaper::after {
-  background: linear-gradient(180deg, rgba(18, 20, 26, 0.68), rgba(18, 20, 26, 0.86));
-}
-
-.topbar, .venues, .tabs, main {
-  position: relative;
-  z-index: 1;
+body[data-venue="shishka"]::before {
+  background-image: none;
+  background-color: #12141a;
+  opacity: 1;
 }
 
 .topbar {
@@ -726,13 +720,17 @@ input[type="number"] {
 }
 
 @media print {
-  .tabs, #tobaccoForm, .add-brand, .icon-btn, .ghost, .danger, .hint, .emp-remove, .no-print, .venues, .app-wallpaper {
+  .tabs, #tobaccoForm, .add-brand, .icon-btn, .ghost, .danger, .hint, .emp-remove, .no-print, .venues {
     display: none !important;
   }
 
   body {
     background: #fff;
     color: #111;
+  }
+
+  body::before {
+    display: none !important;
   }
 
   .item, .stat, .card {

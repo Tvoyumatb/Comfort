@@ -4,10 +4,10 @@ const FILES = [
   "./index.html",
   "./style.css?v=7",
   "./app.js?v=7",
+  "./tangiers-logo.png",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
-  "./wallpaper-tangiers.webp",
 ];
 
 self.addEventListener("install", (event) => {
