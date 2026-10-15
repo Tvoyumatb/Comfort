@@ -765,6 +765,10 @@ window.addEventListener("afterprint", () => {
   document.body.classList.toggle("print-checklist", onSheet);
 });
 
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+
 syncVenueUi();
 setTodayDefaults();
 render();
