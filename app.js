@@ -18,37 +18,40 @@ const OPENING_STOCK = [
 
 const SALE_GROUPS = [
   { id: "classic", num: "1", title: "Классик", note: "Smoke break" },
-  { id: "premium", num: "2", title: "Премиум", note: "Smoke break+" },
+  { id: "premium", num: "2", title: "Премиум", note: "Bonche, Jent Cigar, Troffimoff's" },
   { id: "tangiers", num: "3", title: "Tangiers", note: "Tangiers-акция" },
 ];
 
 const PREMIUM_BRANDS = [
-  "overdose", "spectrum", "deus", "sebero", "starline", "darkside",
-  "musthave", "must have", "satyr", "jent", "hooligan", "хулиган",
+  "bonche",
   "jent cigar",
+  "jentcigar",
+  "troffimoff",
+  "trofimoff",
+  "troffimofs",
 ];
 
 const INVOICE_DATE = "2026-10-10";
 const INVOICE_SEED = [
-  { kind: "tobacco", group: "premium", product: "Spectrum 200g Hard", packs: 1, gramsEach: 200, sum: 210000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Must have 250g", packs: 9, gramsEach: 250, sum: 2295000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Must have 125g", packs: 4, gramsEach: 125, sum: 540000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Spectrum 200g Hard", packs: 1, gramsEach: 200, sum: 210000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Must have 250g", packs: 9, gramsEach: 250, sum: 2295000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Must have 125g", packs: 4, gramsEach: 125, sum: 540000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Palitra 200g", packs: 6, gramsEach: 200, sum: 1200000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Sarma 200g", packs: 12, gramsEach: 200, sum: 2700000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Dark side 250g", packs: 13, gramsEach: 250, sum: 3900000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Overdose 200g", packs: 3, gramsEach: 200, sum: 714000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Dark side 250g", packs: 13, gramsEach: 250, sum: 3900000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Overdose 200g", packs: 3, gramsEach: 200, sum: 714000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Северный 200g", packs: 12, gramsEach: 200, sum: 2760000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Deus 250g", packs: 5, gramsEach: 250, sum: 1250000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Bonche 80g", packs: 1, gramsEach: 80, sum: 245000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "SEBERO BLACK 200g", packs: 5, gramsEach: 200, sum: 1100000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Sebero classic 200g", packs: 11, gramsEach: 200, sum: 2255000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Sebero ГИД 200g", packs: 1, gramsEach: 200, sum: 220000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Starline 250g", packs: 7, gramsEach: 250, sum: 1505000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Deus 250g", packs: 5, gramsEach: 250, sum: 1250000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Bonche 80g", packs: 1, gramsEach: 80, sum: 245000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "SEBERO BLACK 200g", packs: 5, gramsEach: 200, sum: 1100000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Sebero classic 200g", packs: 11, gramsEach: 200, sum: 2255000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Sebero ГИД 200g", packs: 1, gramsEach: 200, sum: 220000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Starline 250g", packs: 7, gramsEach: 250, sum: 1505000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Black Burn 200g", packs: 3, gramsEach: 200, sum: 651000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Jent 200g", packs: 2, gramsEach: 200, sum: 440000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Jent 200g", packs: 2, gramsEach: 200, sum: 440000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Табак Oven 200g", packs: 1, gramsEach: 200, sum: 190000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Хулиган POP/Classic 200g", packs: 2, gramsEach: 200, sum: 380000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Darkside Sabotage 250g", packs: 4, gramsEach: 250, sum: 1260000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Хулиган POP/Classic 200g", packs: 2, gramsEach: 200, sum: 380000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Darkside Sabotage 250g", packs: 4, gramsEach: 250, sum: 1260000, note: "чек 74047" },
   { kind: "inventory", product: "Мундштуки одноразовые", qty: 30, sum: 270000, note: "чек 74051" },
   { kind: "inventory", product: "Ершик для колбы Black", qty: 1, sum: 45000, note: "10.10 ершик" },
 ];
@@ -232,13 +235,14 @@ function applyOpeningStock(data, venueId) {
 }
 
 function applyInvoices(data, venueId) {
-  if (!data || data.invoicesV1) return data;
+  if (!data || data.invoicesV2) return data;
   if (venueId === "shishka") {
-    data.invoicesV1 = true;
+    data.invoicesV2 = true;
     return data;
   }
   if (!Array.isArray(data.tobacco)) data.tobacco = [];
   if (!Array.isArray(data.inventoryStock)) data.inventoryStock = [];
+  data.tobacco = data.tobacco.filter((row) => !String(row.id || "").startsWith("invoice-"));
   INVOICE_SEED.forEach((row, index) => {
     if (row.kind === "inventory") {
       const exists = data.inventoryStock.some((item) => item.name.toLowerCase() === row.product.toLowerCase());
@@ -268,6 +272,7 @@ function applyInvoices(data, venueId) {
     });
   });
   data.invoicesV1 = true;
+  data.invoicesV2 = true;
   return data;
 }
 
@@ -299,6 +304,7 @@ function normalizeVenue(data, venueId) {
       : base.checklist,
     openingV1: Boolean(data.openingV1),
     invoicesV1: Boolean(data.invoicesV1),
+    invoicesV2: Boolean(data.invoicesV2),
   };
   return applyInvoices(applyOpeningStock(applyConsumption(venue), venueId), venueId);
 }
