@@ -234,6 +234,10 @@ function monthKey(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
 }
 
+function periodKey() {
+  return `${monthKey(viewMonth)}-h${half}`;
+}
+
 function lastDayOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
@@ -329,7 +333,7 @@ function damageTotal(empId) {
 }
 
 function extrasFor(empId) {
-  const key = monthKey(viewMonth);
+  const key = periodKey();
   if (!state.extras[key]) state.extras[key] = {};
   if (!state.extras[key][empId]) {
     state.extras[key][empId] = { fines: 0, advances: 0, damage: 0 };
