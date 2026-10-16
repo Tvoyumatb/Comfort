@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=17">
+  <link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
   <header class="topbar no-print">
@@ -207,7 +207,7 @@
           <select name="stockProduct" id="stockProductSelect"></select>
         </label>
         <label id="freeProductWrap"><span id="productLabelText">Марка</span>
-          <input type="text" name="product" list="productsList" placeholder="Например Starline">
+          <input type="text" name="product" list="productsList" placeholder="Необязательно, если жмёте группу">
         </label>
         <datalist id="productsList"></datalist>
         <label>Поставщик
@@ -225,7 +225,11 @@
         <label>Накладная / комментарий
           <input type="text" name="note" placeholder="Номер документа">
         </label>
-        <button type="submit" class="primary">Записать приход</button>
+        <div id="tobaccoGroupWrap">
+          <p class="hint">Граммы + кнопка группы: 1 Классик, 2 Премиум, 3 Tangiers</p>
+          <div class="sale-btns" id="incomeGroupButtons"></div>
+        </div>
+        <button type="submit" class="primary" id="tobaccoSubmit">Записать приход</button>
       </form>
 
       <div class="list" id="tobaccoList"></div>
@@ -248,6 +252,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
