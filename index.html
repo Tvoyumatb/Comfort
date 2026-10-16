@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=21">
+  <link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
   <header class="topbar no-print">
@@ -128,33 +128,10 @@
           <span>Сейчас углей</span>
           <strong id="coalsRemain">0 шт</strong>
         </div>
-        <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Впиши, сколько штук было 01.10, и добавляй пачки ниже — иначе остаток уйдёт в минус.</p>
+        <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Впиши штуки на 01.10, а новые пачки — во вкладке Приход → Уголь.</p>
         <button type="button" class="ghost" id="snapshotBtn">Зафиксировать снятие на выбранную дату</button>
       </div>
-      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака, 5 шт угля и 1 мундштук.</p>
-
-      <form class="card form" id="coalForm">
-        <h2>Добавить уголь</h2>
-        <p class="hint">Пачка — 72 шт. Они сразу плюсуются к «Сейчас углей».</p>
-        <label>Дата
-          <span class="date-wrap">
-            <input type="date" name="date" required>
-          </span>
-        </label>
-        <div class="row">
-          <label>Пачек
-            <input type="number" name="packs" min="1" step="1" value="1" required>
-          </label>
-          <label>Шт в пачке
-            <input type="number" name="perPack" min="1" step="1" value="72">
-          </label>
-        </div>
-        <label>Комментарий
-          <input type="text" name="note" placeholder="Поставщик / накладная">
-        </label>
-        <button type="submit" class="primary">Добавить пачки</button>
-      </form>
-      <div class="list" id="coalIncomeList"></div>
+      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака и 5 шт угля. Пачки угля добавляй в Приходе.</p>
 
       <form class="card form" id="saleForm">
         <h2>Продажи кальянов за день</h2>
@@ -239,6 +216,31 @@
         <button type="submit" class="primary" id="tobaccoSubmit">Записать приход</button>
       </form>
 
+      <form class="card form" id="coalForm" hidden>
+        <h2>Добавить уголь</h2>
+        <p class="hint">Пачка — 72 шт. Они плюсуются к «Сейчас углей» в ревизии.</p>
+        <label>Дата
+          <span class="date-wrap">
+            <input type="date" name="date" required>
+          </span>
+        </label>
+        <div class="row">
+          <label>Пачек
+            <input type="number" name="packs" min="1" step="1" value="1" required>
+          </label>
+          <label>Шт в пачке
+            <input type="number" name="perPack" min="1" step="1" value="72">
+          </label>
+        </div>
+        <label>Сумма
+          <input type="number" name="sum" min="0" step="0.01" placeholder="0">
+        </label>
+        <label>Комментарий
+          <input type="text" name="note" placeholder="Поставщик / накладная">
+        </label>
+        <button type="submit" class="primary">Добавить пачки</button>
+      </form>
+
       <div class="list" id="tobaccoList"></div>
     </section>
 
@@ -269,6 +271,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

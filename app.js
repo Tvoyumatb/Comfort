@@ -52,7 +52,7 @@ const INVOICE_SEED = [
   { kind: "tobacco", group: "classic", product: "Табак Oven 200g", packs: 1, gramsEach: 200, sum: 190000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Хулиган POP/Classic 200g", packs: 2, gramsEach: 200, sum: 380000, note: "чек 74047" },
   { kind: "tobacco", group: "classic", product: "Darkside Sabotage 250g", packs: 4, gramsEach: 250, sum: 1260000, note: "чек 74047" },
-  { kind: "inventory", product: "Мундштуки одноразовые", qty: 30, sum: 270000, note: "чек 74051" },
+  { kind: "inventory", product: "Мундштуки одноразовые", qty: 30, sum: 270000, note: "чек 74051 · 30 пачек" },
   { kind: "inventory", product: "Ершик для колбы Black", qty: 1, sum: 45000, note: "10.10 ершик" },
 ];
 
@@ -133,7 +133,7 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Пачки добавляйте во вкладке Ревизия. Здесь только список",
+    hint: "Пишите пачки: в пачке 72 шт, они сами попадут в остаток углей",
     name: "Наименование",
     placeholder: "Уголь",
     qty: "Пачек",
@@ -287,10 +287,32 @@ function applyInvoices(data, venueId) {
   return data;
 }
 
+function collapseRevisionGroups(data, venueId) {
+  if (!data || data.revisionGroupsV1) return data;
+  const groups = SALE_GROUPS.filter((group) => venueId !== "shishka" || group.id !== "tangiers");
+  const opening = (data.revisions || []).find((row) => row.date === OPENING_DATE);
+  if (opening) {
+    const summed = { classic: 0, premium: 0, tangiers: 0 };
+    (opening.items || []).forEach((item) => {
+      const groupId = brandGroup(item.name);
+      summed[groupId] = (summed[groupId] || 0) + Number(item.grams || 0);
+    });
+    opening.items = groups.map((group) => ({
+      name: group.title,
+      grams: summed[group.id] || 0,
+    }));
+  }
+  data.revisionGroupsV1 = true;
+  return data;
+}
+
 function normalizeVenue(data, venueId) {
   const base = emptyState(venueId);
   if (!data || typeof data !== "object") {
-    return applyInvoices(applyOpeningStock(applyConsumption(base), venueId), venueId);
+    return collapseRevisionGroups(
+      applyInvoices(applyOpeningStock(applyConsumption(base), venueId), venueId),
+      venueId
+    );
   }
   const venue = {
     employees: data.employees?.length ? data.employees : base.employees,
@@ -317,11 +339,15 @@ function normalizeVenue(data, venueId) {
     shishkaOpenV2: Boolean(data.shishkaOpenV2),
     invoicesV1: Boolean(data.invoicesV1),
     invoicesV2: Boolean(data.invoicesV2),
+    revisionGroupsV1: Boolean(data.revisionGroupsV1),
   };
   if (!venue.inventoryStock.some((item) => isMouthpiece(item.name))) {
     venue.inventoryStock.push({ id: uid(), name: "Мундштуки одноразовые", start: 0 });
   }
-  return applyInvoices(applyOpeningStock(applyConsumption(venue), venueId), venueId);
+  return collapseRevisionGroups(
+    applyInvoices(applyOpeningStock(applyConsumption(venue), venueId), venueId),
+    venueId
+  );
 }
 
 function loadDb() {
@@ -766,7 +792,7 @@ function normalizeName(name) {
 function brandGroup(name) {
   const n = normalizeName(name).replace(/\s+/g, " ");
   if (["classic", "premium", "tangiers"].includes(n)) return n;
-  if (n.includes("tangiers") || n.includes("акция") || n.includes("aroma") || n === "tng") {
+  if (n.includes("tangiers") || n === "tng" || n.startsWith("tng ") || n.includes("танж")) {
     return "tangiers";
   }
   if (PREMIUM_BRANDS.some((brand) => n.includes(brand))) return "premium";
@@ -853,13 +879,12 @@ function remainCoals(rev, fromDate) {
     - soldHookahsTotal(fromDate) * coalsPerHookah();
 }
 
-function soldMouthpieces() {
-  return (state.hookahSales || []).reduce((sum, sale) => sum + Number(sale.hookahs || 0), 0);
+function stockNow(item) {
+  return Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
 }
 
-function stockNow(item) {
-  const now = Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
-  return isMouthpiece(item.name) ? now - soldMouthpieces() : now;
+function stockUnit(item) {
+  return isMouthpiece(item.name) ? "пач." : "шт";
 }
 
 function isEmptyRevision(rev) {
@@ -926,14 +951,18 @@ function renderRevision() {
   }
   const coalsWarn = $("#coalsWarn");
   if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || coalsNow > 0;
-  $("#revisionRows").innerHTML = rev.items.map((item, index) => `
+  $("#revisionRows").innerHTML = rev.items.map((item, index) => {
+    const remain = remainGroup(rev, brandGroup(item.name), snap);
+    return `
     <label class="sheet-row">
-      <span>${escapeHtml(item.name)}</span>
+      <span>${escapeHtml(item.name)} <small>сейчас ${formatGrams(remain)} г</small></span>
       <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
     </label>
-  `).join("");
+  `;
+  }).join("");
 
-  $("#saleButtons").innerHTML = SALE_GROUPS.map((group) => {
+  const saleGroups = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
+  $("#saleButtons").innerHTML = saleGroups.map((group) => {
     const remain = remainGroup(rev, group.id, snap);
     const sold = soldHookahsForGroup(group.id, snap);
     return `
@@ -949,26 +978,8 @@ function renderRevision() {
   const sales = [...state.hookahSales]
     .filter((sale) => inRevisionWindow(sale.date, snap))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-  const coals = coalRows(snap);
-  const coalList = $("#coalIncomeList");
-  if (coalList) {
-    if (!coals.length) {
-      coalList.innerHTML = `<p class="empty">Пачек угля пока не добавляли — остаток считается от снятия</p>`;
-    } else {
-      coalList.innerHTML = coals.map((row) => `
-        <article class="card item">
-          <div class="item-head">
-            <h3>${escapeHtml(coalMeta(row))}</h3>
-            <button type="button" class="danger" data-del-tobacco="${row.id}">Удалить</button>
-          </div>
-          <p class="meta">${parseISODate(row.date).toLocaleDateString("ru-RU")}${row.note ? ` · ${escapeHtml(row.note)}` : ""}</p>
-        </article>
-      `).join("");
-    }
-  }
-
   if (!sales.length) {
-    $("#salesList").innerHTML = `<p class="empty">После подтверждения спишется табак, уголь и 1 мундштук</p>`;
+    $("#salesList").innerHTML = `<p class="empty">После подтверждения спишется табак и уголь</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
       <article class="card item">
@@ -980,7 +991,6 @@ function renderRevision() {
           ${parseISODate(sale.date).toLocaleDateString("ru-RU")}
           · −${formatGrams(Number(sale.hookahs) * gramsPerHookah())} г
           · −${formatGrams(Number(sale.hookahs) * coalsPerHookah())} шт угля
-          · −${sale.hookahs} мундштук
         </p>
       </article>
     `).join("");
@@ -1018,7 +1028,12 @@ function syncIncomeForm() {
   const submit = $("#tobaccoSubmit");
   if (submit) submit.hidden = incomingKind !== "inventory";
   const tobaccoForm = $("#tobaccoForm");
-  if (tobaccoForm) tobaccoForm.hidden = incomingKind === "coal";
+  if (tobaccoForm) tobaccoForm.hidden = isCoal;
+  const coalForm = $("#coalForm");
+  if (coalForm) coalForm.hidden = !isCoal;
+  if (isInventory && stockSelect && isMouthpiece(stockSelect.value)) {
+    $("#qtyLabelText").textContent = "Пачек";
+  }
   if (productInput) {
     productInput.required = false;
     if (isCoal && !productInput.value) productInput.value = "Уголь";
@@ -1031,7 +1046,7 @@ function syncIncomeForm() {
     stockSelect.innerHTML = stock
       .map((item) => {
         const now = stockNow(item);
-        return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · сейчас ${now} шт</option>`;
+        return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · сейчас ${now} ${stockUnit(item)}</option>`;
       })
       .join("");
     if (current && [...stockSelect.options].some((opt) => opt.value === current)) {
@@ -1063,7 +1078,7 @@ function renderIncomeGroups() {
     box.innerHTML = "";
     return;
   }
-  box.innerHTML = SALE_GROUPS.map((group) => {
+  box.innerHTML = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers").map((group) => {
     const grams = incomingRows()
       .filter((row) => rowGroup(row) === group.id)
       .reduce((sum, row) => sum + Number(row.qty || 0), 0);
@@ -1088,7 +1103,7 @@ function renderTobacco() {
   renderIncomeGroups();
 
   if (incomingKind === "tobacco") {
-    $("#tobaccoStats").innerHTML = SALE_GROUPS.map((group) => {
+    $("#tobaccoStats").innerHTML = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers").map((group) => {
       const grams = rows
         .filter((row) => rowGroup(row) === group.id)
         .reduce((total, row) => total + Number(row.qty || 0), 0);
@@ -1171,7 +1186,7 @@ function renderInventoryStock() {
                 <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" data-stock-start="${item.id}"></td>
                 <td>${income}</td>
                 <td>${fines}</td>
-                <td class="sum">${now}</td>
+                <td class="sum">${now} ${stockUnit(item)}</td>
                 <td>
                   <button type="button" class="ghost restock" data-restock="${escapeHtml(item.name)}">Дозакупить</button>
                   <button type="button" class="danger" data-del-stock="${item.id}">Удалить</button>
@@ -1186,7 +1201,7 @@ function renderInventoryStock() {
       <input type="text" name="name" placeholder="Добавить позицию, например колба" required>
       <button type="submit" class="primary compact">+</button>
     </form>
-    <p class="hint">Сейчас = изначально + приход − порча. С мундштуков дополнительно минус 1 шт за каждый кальян.</p>
+    <p class="hint">Сейчас = изначально + приход − порча. Мундштуки считаются пачками и с кальянов не списываются.</p>
   `;
 }
 
@@ -1411,12 +1426,15 @@ $("#coalForm").addEventListener("submit", (e) => {
     date: data.date || toISODate(new Date()),
     packs: data.packs,
     perPack,
+    sum: data.sum,
     note: (data.note || "").trim(),
   });
   save();
   e.target.reset();
   setTodayDefaults();
+  incomingKind = "coal";
   renderRevision();
+  renderTobacco();
 });
 
 function recordSale(groupId, hookahs, date) {
@@ -1437,7 +1455,7 @@ function openSaleConfirm(groupId, hookahs, date) {
   const modal = $("#confirmModal");
   const text = $("#confirmText");
   if (text) {
-    text.textContent = `Списать ${hookahs} × ${groupTitle(groupId)}? −${hookahs * gramsPerHookah()} г, −${hookahs * coalsPerHookah()} угля, −${hookahs} мундштук`;
+    text.textContent = `Списать ${hookahs} × ${groupTitle(groupId)}? −${hookahs * gramsPerHookah()} г и −${hookahs * coalsPerHookah()} шт угля`;
   }
   if (modal) modal.hidden = false;
 }
@@ -1479,6 +1497,13 @@ $$(".income-kind").forEach((btn) => {
 
 $("#incomeKindSelect").addEventListener("change", (e) => {
   setIncomingKind(e.target.value);
+});
+
+$("#stockProductSelect")?.addEventListener("change", () => {
+  if (incomingKind !== "inventory") return;
+  $("#qtyLabelText").textContent = isMouthpiece($("#stockProductSelect").value)
+    ? "Пачек"
+    : INCOME.inventory.qty;
 });
 
 $("#incomeGroupButtons").addEventListener("click", (e) => {

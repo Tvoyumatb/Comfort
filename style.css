@@ -453,6 +453,13 @@ input[type="number"] {
   line-height: 1.25;
 }
 
+.sheet-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .sheet-row input {
   margin: 6px 0;
   padding: 8px 10px;
