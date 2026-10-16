@@ -928,6 +928,7 @@ function daysOpenInWindow(fromDate) {
 }
 
 function staffHookahsInWindow(fromDate) {
+  if (db.current !== "tangiers") return 0;
   return daysOpenInWindow(fromDate) * staffPerDay();
 }
 
@@ -1209,11 +1210,15 @@ function renderRevision() {
   const staffHookahs = staffHookahsInWindow(snap);
   const staffBox = $("#staffBox");
   if (staffBox) {
-    staffBox.innerHTML = `
+    const staffOnly = db.current === "tangiers";
+    staffBox.hidden = !staffOnly;
+    staffBox.innerHTML = staffOnly ? `
       <h2>Стафф кальяны</h2>
-      <p class="hint">Каждый день ${staffPerDay()} классик с ${parseISODate(OPENING_DATE).toLocaleDateString("ru-RU")}. За это снятие: ${staffDays} дн. × ${staffPerDay()} = ${staffHookahs} кальянов (−${formatGrams(staffHookahs * gramsPerHookah())} г и −${formatGrams(staffHookahs * coalsPerHookah())} шт угля).</p>
-    `;
+      <p class="hint">Только Tangiers. Каждый день ${staffPerDay()} классик с ${parseISODate(OPENING_DATE).toLocaleDateString("ru-RU")}. За это снятие: ${staffDays} дн. × ${staffPerDay()} = ${staffHookahs} кальянов (−${formatGrams(staffHookahs * gramsPerHookah())} г и −${formatGrams(staffHookahs * coalsPerHookah())} шт угля).</p>
+    ` : "";
   }
+  const staffInputWrap = $("#staffPerDay")?.closest("label");
+  if (staffInputWrap) staffInputWrap.hidden = db.current !== "tangiers";
 
   const sales = [...state.hookahSales]
     .filter((sale) => inRevisionWindow(sale.date, snap))

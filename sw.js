@@ -1,9 +1,9 @@
-const CACHE = "journal-v29";
+const CACHE = "journal-v30";
 const FILES = [
   "./",
   "./index.html",
-  "./style.css?v=29",
-  "./app.js?v=29",
+  "./style.css?v=30",
+  "./app.js?v=30",
   "./wallpaper-tangiers.jpg",
   "./tangiers-logo.png",
   "./manifest.webmanifest",
