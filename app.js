@@ -200,6 +200,205 @@ function emptyOpening(venueId) {
   };
 }
 
+function seedStockItem(data, name, kind = "item") {
+  if (!Array.isArray(data.inventoryStock)) data.inventoryStock = defaultInventory();
+  const found = data.inventoryStock.find((item) => item.name.toLowerCase() === name.toLowerCase());
+  if (found) {
+    if (!found.kind) found.kind = kind;
+    return found.name;
+  }
+  data.inventoryStock.push({ id: uid(), name, start: 0, kind });
+  return name;
+}
+
+function seedCoalItem(data, name) {
+  if (!Array.isArray(data.coalStock)) data.coalStock = [];
+  const found = data.coalStock.find((item) => item.name.toLowerCase() === name.toLowerCase());
+  if (found) return found.name;
+  data.coalStock.push({ id: uid(), name, start: 0 });
+  return name;
+}
+
+function applyStartInvoices(data, venueId) {
+  if (!data || venueId !== "tangiers" || data.invoicesFromStartV1) return data;
+  if (!Array.isArray(data.tobacco)) data.tobacco = [];
+  const supplier = "Rotana";
+  const add = (row) => data.tobacco.push({ id: uid(), supplier, ...row });
+  const tobacco = (date, check, group, product, qty, sum) => add({
+    kind: "tobacco",
+    group,
+    date,
+    product,
+    qty,
+    sum,
+    note: `чек ${check}`,
+  });
+  const inventory = (date, check, name, qty, sum, kind = "item") => add({
+    kind: "inventory",
+    date,
+    product: seedStockItem(data, name, kind),
+    qty,
+    sum,
+    note: check ? `чек ${check}` : "скрин без номера чека",
+  });
+  const coal = (date, check, name, packs, sum) => {
+    const product = seedCoalItem(data, name);
+    add({
+      kind: "coal",
+      date,
+      product,
+      packs,
+      perPack: DEFAULT_COALS_PER_PACK,
+      qty: packs * DEFAULT_COALS_PER_PACK,
+      sum,
+      note: `чек ${check} · ${packs} пач. × ${DEFAULT_COALS_PER_PACK} шт`,
+    });
+  };
+
+  // 72389 — 28.08, только инвентарь/чаши
+  inventory("2026-08-28", "72389", "Чаша D-Shot", 15, 3375000, "bowl");
+  inventory("2026-08-28", "72389", "Чаша HYPE", 7, 1015000, "bowl");
+  inventory("2026-08-28", "72389", "Чаша Облако SOLO", 3, 405000, "bowl");
+  inventory("2026-08-28", "72389", "Чаша Облако M/L/BLACK", 5, 725000, "bowl");
+  inventory("2026-08-28", "72389", "Кадиллак Black", 4, 400000, "bowl");
+  inventory("2026-08-28", "72389", "Чаша Alpha Bowl", 3, 390000, "bowl");
+  inventory("2026-08-28", "72389", "Калауд Lotus без упаковки", 60, 1800000);
+  inventory("2026-08-28", "72389", "Колба Craft", 40, 6000000);
+
+  // 72416 — 29.08, один чек на несколько скринов
+  tobacco("2026-08-29", "72416", "classic", "Must have 125g", 500, 540000);
+  tobacco("2026-08-29", "72416", "classic", "Must have 250g", 4500, 4590000);
+  tobacco("2026-08-29", "72416", "premium", "Bonche 120g", 600, 1875000);
+  tobacco("2026-08-29", "72416", "premium", "Jent Cigar 100g", 200, 390000);
+  tobacco("2026-08-29", "72416", "classic", "Everest 100g", 800, 1320000);
+  tobacco("2026-08-29", "72416", "classic", "Spectrum 200g Hard", 400, 420000);
+  tobacco("2026-08-29", "72416", "classic", "Spectrum 200g Prime", 600, 975000);
+  tobacco("2026-08-29", "72416", "classic", "NASH R 200g", 800, 960000);
+  tobacco("2026-08-29", "72416", "classic", "Palitra 200g", 1600, 1600000);
+  tobacco("2026-08-29", "72416", "classic", "Darkside Sabotage 250g", 500, 630000);
+  tobacco("2026-08-29", "72416", "classic", "Satyr 100g", 600, 990000);
+  tobacco("2026-08-29", "72416", "classic", "Hell 200g", 600, 420000);
+  tobacco("2026-08-29", "72416", "classic", "Banger 200g", 1000, 1075000);
+  tobacco("2026-08-29", "72416", "classic", "Sarma 200g", 2800, 3150000);
+  tobacco("2026-08-29", "72416", "classic", "Deus 250g", 1250, 1250000);
+  tobacco("2026-08-29", "72416", "classic", "Северный 200g", 1400, 1610000);
+  tobacco("2026-08-29", "72416", "classic", "Darkside 250g", 1250, 1500000);
+  tobacco("2026-08-29", "72416", "classic", "Starline 250g", 2000, 1720000);
+  tobacco("2026-08-29", "72416", "classic", "Black Burn 200g", 600, 651000);
+  tobacco("2026-08-29", "72416", "classic", "Jent 200g", 800, 880000);
+  tobacco("2026-08-29", "72416", "classic", "Overdose 200g", 1600, 1904000);
+  tobacco("2026-08-29", "72416", "classic", "Sebero Black 200g", 1400, 1540000);
+  tobacco("2026-08-29", "72416", "classic", "Sebero classic 200g", 1600, 1640000);
+  tobacco("2026-08-29", "72416", "classic", "Sebero ГИД 200g", 400, 440000);
+  tobacco("2026-08-29", "72416", "classic", "Sebero Arctic Mix 200g", 200, 205000);
+  tobacco("2026-08-29", "72416", "classic", "Oven 200g", 1000, 950000);
+  tobacco("2026-08-29", "72416", "classic", "Hooligan POP/Classic 200g", 1800, 1710000);
+  tobacco("2026-08-29", "72416", "classic", "Hooligan Hard 200g", 1200, 1200000);
+  inventory("2026-08-29", "72416", "Калауд Alpha SILVER", 1, 450000);
+  inventory("2026-08-29", "72416", "Калауд Alpha Gold", 1, 500000);
+  coal("2026-08-29", "72416", "BigMaks GO 25mm", 15, 975000);
+  inventory("2026-08-29", "72416", "Мундштуки одноразовые", 30, 270000);
+  inventory("2026-08-29", "72416", "Ершик для шахты тонкий", 2, 70000);
+  inventory("2026-08-29", "72416", "Щипцы Blade R", 3, 105000);
+  inventory("2026-08-29", "72416", "Щипцы Alpha R", 2, 100000);
+  inventory("2026-08-29", "72416", "Ершик для колбы", 3, 105000);
+  inventory("2026-08-29", "72416", "Колпак Black", 1, 120000);
+  inventory("2026-08-29", "72416", "Колпак хром", 1, 95000);
+  inventory("2026-08-29", "72416", "Шило Пластик", 5, 75000);
+  inventory("2026-08-29", "72416", "Доска Darkside", 1, 280000);
+  inventory("2026-08-29", "72416", "Коврик Darkside", 1, 280000);
+
+  // 72418 — 29.08
+  tobacco("2026-08-29", "72418", "premium", "Bonche 80g", 80, 245000);
+  tobacco("2026-08-29", "72418", "premium", "Trofimoff's Burley / No Aroma 125g", 125, 230000);
+
+  // 72675 — 05.09
+  coal("2026-09-05", "72675", "Cocoloco 25 mm", 60, 4380000);
+
+  // 73015 — 12.09, один чек на несколько скринов
+  tobacco("2026-09-12", "73015", "classic", "Darkside Xperince 250g", 1500, 1800000);
+  tobacco("2026-09-12", "73015", "classic", "Overdose 200g", 2200, 2618000);
+  inventory("2026-09-12", "73015", "Коврик Darkside", 1, 280000);
+  tobacco("2026-09-12", "73015", "classic", "Sebero classic 200g", 200, 205000);
+  tobacco("2026-09-12", "73015", "classic", "Deus 250g", 1250, 1250000);
+  inventory("2026-09-12", "73015", "Фольга Small", 1, 35000);
+  tobacco("2026-09-12", "73015", "premium", "Jent Cigar 100g", 400, 780000);
+  tobacco("2026-09-12", "73015", "classic", "Darkside Sabotage 250g", 500, 630000);
+  tobacco("2026-09-12", "73015", "classic", "Darkside 250g", 3750, 4500000);
+  tobacco("2026-09-12", "73015", "classic", "Starline 250g", 4500, 3870000);
+  tobacco("2026-09-12", "73015", "classic", "Sarma 200g", 1800, 2025000);
+  tobacco("2026-09-12", "73015", "classic", "Северный 200g", 1600, 1840000);
+  tobacco("2026-09-12", "73015", "premium", "Trofimoff's Burley / No Aroma 125g", 250, 460000);
+  tobacco("2026-09-12", "73015", "classic", "Everest 100g", 200, 330000);
+  tobacco("2026-09-12", "73015", "classic", "Palitra 200g", 200, 200000);
+  tobacco("2026-09-12", "73015", "classic", "NASH R 200g", 800, 960000);
+  tobacco("2026-09-12", "73015", "classic", "Must have 125g", 625, 675000);
+  tobacco("2026-09-12", "73015", "classic", "Black Burn 200g", 2200, 2387000);
+  tobacco("2026-09-12", "73015", "classic", "Jent 200g", 200, 220000);
+  inventory("2026-09-12", "73015", "Чаша Облако M/L/BLACK", 8, 1200000, "bowl");
+  inventory("2026-09-12", "73015", "Колба Craft", 1, 160000);
+
+  // Tangiers AST — 12.09
+  add({
+    kind: "tobacco",
+    group: "tangiers",
+    date: "2026-09-12",
+    product: "TANGIERS 250g",
+    qty: 2500,
+    sum: 135000,
+    supplier: "Склад Мангилик Rotana",
+    note: "док 4493705665 · 135000 тг",
+  });
+
+  // 73366 — 22.09
+  tobacco("2026-09-22", "73366", "classic", "Darkside 250g", 1750, 2100000);
+  tobacco("2026-09-22", "73366", "classic", "Must have 125g", 500, 540000);
+  tobacco("2026-09-22", "73366", "classic", "Must have 250g", 1750, 1785000);
+  tobacco("2026-09-22", "73366", "classic", "Overdose 200g", 1000, 1190000);
+  tobacco("2026-09-22", "73366", "classic", "NASH R 200g", 600, 720000);
+  tobacco("2026-09-22", "73366", "classic", "Black Burn 200g", 1000, 1085000);
+  tobacco("2026-09-22", "73366", "classic", "Starline 250g", 2000, 1720000);
+  tobacco("2026-09-22", "73366", "classic", "Sebero ГИД 200g", 800, 880000);
+  tobacco("2026-09-22", "73366", "classic", "Sebero Black 200g", 800, 880000);
+  tobacco("2026-09-22", "73366", "classic", "Sebero classic 200g", 200, 205000);
+
+  // 73442 — 23.09
+  inventory("2026-09-23", "73442", "Мундштуки одноразовые", 30, 270000);
+
+  // 73738 — 02.10
+  coal("2026-10-02", "73738", "Cocoloco 25 mm", 80, 5840000);
+
+  // 740047 — 10.10, один чек на несколько скринов
+  tobacco("2026-10-10", "740047", "classic", "Spectrum 200g Hard", 200, 210000);
+  tobacco("2026-10-10", "740047", "classic", "Must have 250g", 2250, 2295000);
+  tobacco("2026-10-10", "740047", "classic", "Must have 125g", 500, 540000);
+  tobacco("2026-10-10", "740047", "classic", "Palitra 200g", 1200, 1200000);
+  tobacco("2026-10-10", "740047", "classic", "Sarma 200g", 2400, 2700000);
+  tobacco("2026-10-10", "740047", "classic", "Darkside 250g", 3250, 3900000);
+  tobacco("2026-10-10", "740047", "classic", "Overdose 200g", 600, 714000);
+  tobacco("2026-10-10", "740047", "classic", "Северный 200g", 2400, 2760000);
+  tobacco("2026-10-10", "740047", "classic", "Deus 250g", 1250, 1250000);
+  tobacco("2026-10-10", "740047", "premium", "Bonche 80g", 80, 245000);
+  tobacco("2026-10-10", "740047", "classic", "Sebero Black 200g", 1000, 1100000);
+  tobacco("2026-10-10", "740047", "classic", "Sebero classic 200g", 2200, 2255000);
+  tobacco("2026-10-10", "740047", "classic", "Sebero ГИД 200g", 200, 220000);
+  tobacco("2026-10-10", "740047", "classic", "Starline 250g", 1750, 1505000);
+  tobacco("2026-10-10", "740047", "classic", "Black Burn 200g", 600, 651000);
+  tobacco("2026-10-10", "740047", "classic", "Jent 200g", 400, 440000);
+  tobacco("2026-10-10", "740047", "classic", "Oven 200g", 200, 190000);
+  tobacco("2026-10-10", "740047", "classic", "Hooligan POP/Classic 200g", 400, 380000);
+  tobacco("2026-10-10", "740047", "classic", "Darkside Sabotage 250g", 1000, 1260000);
+
+  // 740051 — 10.10
+  inventory("2026-10-10", "740051", "Мундштуки одноразовые", 30, 270000);
+
+  // Скрин без шапки, дата файла 10.10
+  inventory("2026-10-10", "", "Ершик для колбы Black", 1, 45000);
+
+  data.invoicesFromStartV1 = true;
+  return data;
+}
+
 function shiftOpeningDate(data, venueId) {
   if (!data || data.startFromAug28V1) return data;
   const oldOpen = "2026-10-01";
@@ -267,8 +466,12 @@ function normalizeVenue(data, venueId) {
     revisionGroupsV1: Boolean(data.revisionGroupsV1),
     freshStockV1: Boolean(data.freshStockV1),
     startFromAug28V1: Boolean(data.startFromAug28V1),
+    invoicesFromStartV1: Boolean(data.invoicesFromStartV1),
   };
-  return shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId);
+  return applyStartInvoices(
+    shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId),
+    venueId
+  );
 }
 
 function loadDb() {
