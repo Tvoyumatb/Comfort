@@ -133,7 +133,7 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Пишите пачки: в пачке 72 шт, они сами попадут в остаток углей",
+    hint: "Пачки добавляйте во вкладке Ревизия. Здесь только список",
     name: "Наименование",
     placeholder: "Уголь",
     qty: "Пачек",
@@ -145,6 +145,8 @@ const INCOME = {
 
 const db = loadDb();
 let state = db.venues[db.current];
+let shownRevDate = OPENING_DATE;
+let pendingSale = null;
 let viewMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let half = new Date().getDate() > 15 ? 1 : 0;
 let incomingKind = "tobacco";
@@ -156,17 +158,22 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function isMouthpiece(name) {
+  return /мундштук/i.test(String(name || ""));
+}
+
 function defaultInventory() {
   return [
     { id: uid(), name: "Колба", start: 0 },
     { id: uid(), name: "Чаша", start: 0 },
+    { id: uid(), name: "Мундштуки одноразовые", start: 0 },
   ];
 }
 
 function defaultChecklist(venueId) {
   const items = venueId === "shishka"
-    ? ["Classic", "Premium", "Smoke brush", "Smoke brush"]
-    : ["Classic", "Premium", "Tangiers", "Smoke brush", "Smoke brush", "Tangiers-Aroma"];
+    ? ["Classic", "Premium", "Smoke break", "Smoke break"]
+    : ["Classic", "Premium", "Tangiers", "Smoke break", "Smoke break", "Tangiers-Aroma"];
   return {
     tableNo: "20",
     copies: 60,
@@ -209,11 +216,8 @@ function applyConsumption(data) {
 }
 
 function applyOpeningStock(data, venueId) {
-  if (!data || data.openingV1) return data;
-  if (venueId === "shishka") {
-    data.openingV1 = true;
-    return data;
-  }
+  if (!data) return data;
+  if (data.openingV1 && (venueId !== "shishka" || data.shishkaOpenV2)) return data;
   if (!Array.isArray(data.revisions)) data.revisions = [];
   data.revisions = data.revisions.filter((row) => {
     if (row.date === OPENING_DATE) return true;
@@ -225,12 +229,19 @@ function applyOpeningStock(data, venueId) {
     rev = { date: OPENING_DATE, coals: 0, items: [] };
     data.revisions.push(rev);
   }
-  OPENING_STOCK.forEach((open) => {
+  const stock = venueId === "shishka"
+    ? [
+        { name: "Классик", grams: 0 },
+        { name: "Премиум", grams: 0 },
+      ]
+    : OPENING_STOCK;
+  stock.forEach((open) => {
     const item = rev.items.find((row) => row.name === open.name);
     if (item) item.grams = open.grams;
     else rev.items.unshift({ name: open.name, grams: open.grams });
   });
   data.openingV1 = true;
+  if (venueId === "shishka") data.shishkaOpenV2 = true;
   return data;
 }
 
@@ -303,9 +314,13 @@ function normalizeVenue(data, venueId) {
         }
       : base.checklist,
     openingV1: Boolean(data.openingV1),
+    shishkaOpenV2: Boolean(data.shishkaOpenV2),
     invoicesV1: Boolean(data.invoicesV1),
     invoicesV2: Boolean(data.invoicesV2),
   };
+  if (!venue.inventoryStock.some((item) => isMouthpiece(item.name))) {
+    venue.inventoryStock.push({ id: uid(), name: "Мундштуки одноразовые", start: 0 });
+  }
   return applyInvoices(applyOpeningStock(applyConsumption(venue), venueId), venueId);
 }
 
@@ -838,21 +853,53 @@ function remainCoals(rev, fromDate) {
     - soldHookahsTotal(fromDate) * coalsPerHookah();
 }
 
+function soldMouthpieces() {
+  return (state.hookahSales || []).reduce((sum, sale) => sum + Number(sale.hookahs || 0), 0);
+}
+
+function stockNow(item) {
+  const now = Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
+  return isMouthpiece(item.name) ? now - soldMouthpieces() : now;
+}
+
+function isEmptyRevision(rev) {
+  if (!rev) return true;
+  if (rev.date === OPENING_DATE) return false;
+  return revisionTotal(rev) === 0 && Number(rev.coals || 0) === 0;
+}
+
+function pruneEmptyRevisions() {
+  if (!Array.isArray(state.revisions)) return;
+  const next = state.revisions.filter((rev) => !isEmptyRevision(rev) || rev.date === OPENING_DATE);
+  if (next.length !== state.revisions.length) {
+    state.revisions = next;
+    save();
+  }
+}
+
+function shownRevision() {
+  return (state.revisions || []).find((row) => row.date === shownRevDate)
+    || latestRevision(shownRevDate)
+    || ensureRevision(OPENING_DATE);
+}
+
 function formatGrams(n) {
   return Number(n || 0).toLocaleString("ru-RU");
 }
 
 function latestRevision(date) {
   return (state.revisions || [])
-    .filter((rev) => rev.date <= date)
+    .filter((rev) => rev.date <= date && !isEmptyRevision(rev))
     .sort((a, b) => b.date.localeCompare(a.date))[0];
 }
 
 function renderRevision() {
   applyOpeningStock(state, db.current);
+  pruneEmptyRevisions();
   const date = $("#revisionDate").value || OPENING_DATE;
-  $("#revisionDate").value = date;
-  const rev = state.revisions.find((row) => row.date === date) || latestRevision(date) || ensureRevision(OPENING_DATE);
+  const exact = (state.revisions || []).find((row) => row.date === date && !isEmptyRevision(row));
+  const rev = exact || latestRevision(date) || ensureRevision(OPENING_DATE);
+  shownRevDate = rev.date;
   $("#coalsInput").value = rev.coals || 0;
   if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
   const gramsInput = $("#gramsPerHookah");
@@ -877,6 +924,8 @@ function renderRevision() {
     coalsRemain.textContent = `${formatGrams(coalsNow)} шт`;
     coalsRemain.classList.toggle("low-stock", coalsNow <= 0);
   }
+  const coalsWarn = $("#coalsWarn");
+  if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || coalsNow > 0;
   $("#revisionRows").innerHTML = rev.items.map((item, index) => `
     <label class="sheet-row">
       <span>${escapeHtml(item.name)}</span>
@@ -919,7 +968,7 @@ function renderRevision() {
   }
 
   if (!sales.length) {
-    $("#salesList").innerHTML = `<p class="empty">Жмите 1 Классик, 2 Премиум или 3 Tangiers — с остатка группы спишется само</p>`;
+    $("#salesList").innerHTML = `<p class="empty">После подтверждения спишется табак, уголь и 1 мундштук</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
       <article class="card item">
@@ -931,6 +980,7 @@ function renderRevision() {
           ${parseISODate(sale.date).toLocaleDateString("ru-RU")}
           · −${formatGrams(Number(sale.hookahs) * gramsPerHookah())} г
           · −${formatGrams(Number(sale.hookahs) * coalsPerHookah())} шт угля
+          · −${sale.hookahs} мундштук
         </p>
       </article>
     `).join("");
@@ -966,7 +1016,9 @@ function syncIncomeForm() {
   const groupWrap = $("#tobaccoGroupWrap");
   if (groupWrap) groupWrap.hidden = incomingKind !== "tobacco";
   const submit = $("#tobaccoSubmit");
-  if (submit) submit.hidden = incomingKind === "tobacco";
+  if (submit) submit.hidden = incomingKind !== "inventory";
+  const tobaccoForm = $("#tobaccoForm");
+  if (tobaccoForm) tobaccoForm.hidden = incomingKind === "coal";
   if (productInput) {
     productInput.required = false;
     if (isCoal && !productInput.value) productInput.value = "Уголь";
@@ -978,7 +1030,7 @@ function syncIncomeForm() {
     const current = stockSelect.value;
     stockSelect.innerHTML = stock
       .map((item) => {
-        const now = Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
+        const now = stockNow(item);
         return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · сейчас ${now} шт</option>`;
       })
       .join("");
@@ -1112,7 +1164,7 @@ function renderInventoryStock() {
           ${stock.map((item) => {
             const income = incomingQtyFor(item.name);
             const fines = fineQtyFor(item.name);
-            const now = Number(item.start || 0) + income - fines;
+            const now = stockNow(item);
             return `
               <tr class="${now <= 2 ? "low-stock" : ""}">
                 <th class="name">${escapeHtml(item.name)}</th>
@@ -1134,13 +1186,20 @@ function renderInventoryStock() {
       <input type="text" name="name" placeholder="Добавить позицию, например колба" required>
       <button type="submit" class="primary compact">+</button>
     </form>
-    <p class="hint">Изначально ставите один раз. Дальше только приход / дозакупка и порча: сейчас = изначально + приход − порча.</p>
+    <p class="hint">Сейчас = изначально + приход − порча. С мундштуков дополнительно минус 1 шт за каждый кальян.</p>
   `;
 }
 
 function ensureChecklist() {
   if (!state.checklist || !Array.isArray(state.checklist.items)) {
     state.checklist = defaultChecklist(db.current);
+  }
+  if (!state.checklist.checklistV2) {
+    state.checklist.items = state.checklist.items.map((item) =>
+      String(item).replace(/Smoke brush/gi, "Smoke break")
+    );
+    state.checklist.checklistV2 = true;
+    save();
   }
   return state.checklist;
 }
@@ -1197,7 +1256,6 @@ $$(".tab").forEach((btn) => {
       panel.classList.toggle("is-active", active);
       panel.hidden = !active;
     });
-    document.body.classList.toggle("print-checklist", btn.dataset.tab === "checklist");
   });
 });
 
@@ -1226,7 +1284,9 @@ $("#rosterWrap").addEventListener("click", (e) => {
   if (cell) cycleCell(cell);
   const del = e.target.closest("[data-del-emp]");
   if (del) {
-    state.employees = state.employees.filter((emp) => emp.id !== del.dataset.delEmp);
+    const emp = state.employees.find((row) => row.id === del.dataset.delEmp);
+    if (!emp || !window.confirm(`Удалить ${emp.name} из табеля?`)) return;
+    state.employees = state.employees.filter((row) => row.id !== del.dataset.delEmp);
     save();
     renderShifts();
   }
@@ -1289,18 +1349,19 @@ $("#revisionDate").addEventListener("change", () => {
 $("#revisionRows").addEventListener("input", (e) => {
   const index = e.target.dataset.grams;
   if (index == null) return;
-  const rev = ensureRevision($("#revisionDate").value);
+  const rev = shownRevision();
+  if (!rev?.items[Number(index)]) return;
   rev.items[Number(index)].grams = Number(e.target.value || 0);
   save();
-  const date = $("#revisionDate").value;
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionRemain").textContent = formatGrams(
-    SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, date), 0)
+    SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, rev.date), 0)
   );
 });
 
 $("#coalsInput").addEventListener("input", (e) => {
-  const rev = ensureRevision($("#revisionDate").value);
+  const rev = shownRevision();
+  if (!rev) return;
   rev.coals = Number(e.target.value || 0);
   save();
   const remainEl = $("#coalsRemain");
@@ -1309,13 +1370,16 @@ $("#coalsInput").addEventListener("input", (e) => {
     remainEl.textContent = `${formatGrams(now)} шт`;
     remainEl.classList.toggle("low-stock", now <= 0);
   }
+  const coalsWarn = $("#coalsWarn");
+  if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || remainCoals(rev, rev.date) > 0;
 });
 
 $("#addBrandForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = new FormData(e.target).get("name").trim();
   if (!name) return;
-  const rev = ensureRevision($("#revisionDate").value);
+  const rev = shownRevision();
+  if (!rev) return;
   if (!rev.items.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
     rev.items.push({ name, grams: 0 });
     save();
@@ -1355,20 +1419,52 @@ $("#coalForm").addEventListener("submit", (e) => {
   renderRevision();
 });
 
+function recordSale(groupId, hookahs, date) {
+  if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
+  state.hookahSales.push({
+    id: uid(),
+    date,
+    product: groupId,
+    hookahs: Math.max(1, hookahs),
+  });
+  save();
+  renderRevision();
+  if (incomingKind === "inventory") renderInventoryStock();
+}
+
+function openSaleConfirm(groupId, hookahs, date) {
+  pendingSale = { groupId, hookahs, date };
+  const modal = $("#confirmModal");
+  const text = $("#confirmText");
+  if (text) {
+    text.textContent = `Списать ${hookahs} × ${groupTitle(groupId)}? −${hookahs * gramsPerHookah()} г, −${hookahs * coalsPerHookah()} угля, −${hookahs} мундштук`;
+  }
+  if (modal) modal.hidden = false;
+}
+
+function closeSaleConfirm() {
+  pendingSale = null;
+  const modal = $("#confirmModal");
+  if (modal) modal.hidden = true;
+}
+
 $("#saleButtons").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-sale-group]");
   if (!btn) return;
   const hookahs = Number(document.querySelector('#saleForm [name="hookahs"]')?.value || 1);
   const date = document.querySelector('#saleForm [name="date"]')?.value || toISODate(new Date());
-  if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
-  state.hookahSales.push({
-    id: uid(),
-    date,
-    product: btn.dataset.saleGroup,
-    hookahs: Math.max(1, hookahs),
-  });
-  save();
-  renderRevision();
+  openSaleConfirm(btn.dataset.saleGroup, Math.max(1, hookahs), date);
+});
+
+$("#confirmOk")?.addEventListener("click", () => {
+  if (!pendingSale) return;
+  recordSale(pendingSale.groupId, pendingSale.hookahs, pendingSale.date);
+  closeSaleConfirm();
+});
+
+$("#confirmCancel")?.addEventListener("click", () => closeSaleConfirm());
+$("#confirmModal")?.addEventListener("click", (e) => {
+  if (e.target.id === "confirmModal") closeSaleConfirm();
 });
 
 function setIncomingKind(kind) {
@@ -1550,6 +1646,82 @@ $("#addChecklistItemForm").addEventListener("submit", (e) => {
   renderChecklist();
 });
 
+$("#snapshotBtn")?.addEventListener("click", () => {
+  const date = $("#revisionDate").value || OPENING_DATE;
+  const prev = shownRevision();
+  if (!prev) return;
+  if ((state.revisions || []).some((row) => row.date === date && !isEmptyRevision(row))) {
+    window.alert("На эту дату снятие уже есть. Поставь другую дату.");
+    return;
+  }
+  const items = SALE_GROUPS
+    .filter((group) => db.current !== "shishka" || group.id !== "tangiers")
+    .map((group) => ({
+      name: group.title,
+      grams: Math.max(0, remainGroup(prev, group.id, prev.date)),
+    }));
+  state.revisions = (state.revisions || []).filter((row) => row.date !== date);
+  state.revisions.push({
+    date,
+    coals: Math.max(0, remainCoals(prev, prev.date)),
+    items,
+  });
+  save();
+  renderRevision();
+});
+
+async function exportDb() {
+  const name = `журнал-${toISODate(new Date())}.json`;
+  const text = JSON.stringify(db);
+  const file = new File([text], name, { type: "application/json" });
+  try {
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: "Копия журнала" });
+      return;
+    }
+  } catch {
+    /* user cancelled share */
+    return;
+  }
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function importDb(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const raw = JSON.parse(String(reader.result || ""));
+      if (!raw?.venues) throw new Error("bad");
+      db.current = VENUES[raw.current] ? raw.current : "tangiers";
+      db.venues = {
+        tangiers: normalizeVenue(raw.venues.tangiers, "tangiers"),
+        shishka: normalizeVenue(raw.venues.shishka, "shishka"),
+      };
+      state = db.venues[db.current];
+      save();
+      syncVenueUi();
+      setTodayDefaults();
+      render();
+      window.alert("Копия залита");
+    } catch {
+      window.alert("Этот файл не подходит");
+    }
+  };
+  reader.readAsText(file);
+}
+
+$("#exportBtn")?.addEventListener("click", () => exportDb());
+$("#importBtn")?.addEventListener("click", () => $("#importFile")?.click());
+$("#importFile")?.addEventListener("change", (e) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+  if (file) importDb(file);
+});
+
 $("#printBtn").addEventListener("click", () => {
   const onSheet = document.querySelector(".tab.is-active")?.dataset.tab === "checklist";
   document.body.classList.toggle("print-checklist", onSheet);
@@ -1557,8 +1729,7 @@ $("#printBtn").addEventListener("click", () => {
 });
 
 window.addEventListener("afterprint", () => {
-  const onSheet = document.querySelector(".tab.is-active")?.dataset.tab === "checklist";
-  document.body.classList.toggle("print-checklist", onSheet);
+  document.body.classList.remove("print-checklist");
 });
 
 if ("serviceWorker" in navigator) {

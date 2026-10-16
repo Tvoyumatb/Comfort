@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
   <header class="topbar no-print">
@@ -19,7 +19,12 @@
       <p class="eyebrow" id="venueEyebrow">Журнал точки</p>
       <h1 id="periodTitle">Отчёт за 2 недели</h1>
     </div>
-    <button type="button" class="ghost" id="printBtn">Печать</button>
+    <div class="top-actions">
+      <button type="button" class="ghost" id="exportBtn">Копия</button>
+      <button type="button" class="ghost" id="importBtn">Залить</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <button type="button" class="ghost" id="printBtn">Печать</button>
+    </div>
   </header>
 
   <nav class="venues no-print" role="tablist" aria-label="Заведение">
@@ -123,8 +128,10 @@
           <span>Сейчас углей</span>
           <strong id="coalsRemain">0 шт</strong>
         </div>
+        <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Впиши, сколько штук было 01.10, и добавляй пачки ниже — иначе остаток уйдёт в минус.</p>
+        <button type="button" class="ghost" id="snapshotBtn">Зафиксировать снятие на выбранную дату</button>
       </div>
-      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян списывает 25 г табака и 5 шт угля.</p>
+      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака, 5 шт угля и 1 мундштук.</p>
 
       <form class="card form" id="coalForm">
         <h2>Добавить уголь</h2>
@@ -191,7 +198,7 @@
 
       <form class="card form" id="tobaccoForm">
         <h2>Новый приход</h2>
-        <label>Тип
+        <label id="incomeKindWrap" hidden>Тип
           <select name="kind" id="incomeKindSelect">
             <option value="tobacco">Табак</option>
             <option value="inventory">Инвентарь</option>
@@ -252,6 +259,16 @@
     </section>
   </main>
 
-  <script src="app.js?v=20"></script>
+  <div id="confirmModal" class="modal" hidden>
+    <div class="modal-card">
+      <p id="confirmText">Списать кальян?</p>
+      <div class="row">
+        <button type="button" class="ghost" id="confirmCancel">Отмена</button>
+        <button type="button" class="primary" id="confirmOk">Да, списать</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=21"></script>
 </body>
 </html>
