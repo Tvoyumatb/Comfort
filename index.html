@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header class="topbar no-print">
@@ -66,12 +66,13 @@
       <h2 class="block-title">Расчёт за период</h2>
       <div class="excel-card pay-wrap" id="payWrap"></div>
 
-      <h2 class="block-title">Штрафы — за что именно</h2>
+      <h2 class="block-title">Порча — колба, чаша и другое</h2>
+      <p class="hint">Штраф в таблице выше — за опоздание. Здесь списывается инвентарь: колба, чаша и т.д.</p>
       <form class="card form" id="fineForm">
         <label>Сотрудник
           <select name="empId" id="fineEmpSelect" required></select>
         </label>
-        <label>За что
+        <label>Что испортили
           <input type="text" name="what" list="fineWhatList" placeholder="Колба, чаша..." required>
         </label>
         <datalist id="fineWhatList"></datalist>
@@ -88,7 +89,7 @@
             <input type="number" name="sum" min="0" step="1000" required>
           </label>
         </div>
-        <button type="submit" class="primary">Добавить штраф</button>
+        <button type="submit" class="primary">Добавить порчу</button>
       </form>
       <div class="list" id="fineList"></div>
     </section>
@@ -191,6 +192,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

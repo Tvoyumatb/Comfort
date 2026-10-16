@@ -322,10 +322,10 @@ function finesForEmp(empId) {
   return (state.fines || []).filter((f) => f.empId === empId && inCurrentPeriod(f.date));
 }
 
-function fineTotal(empId) {
+function damageTotal(empId) {
   const items = finesForEmp(empId);
   if (items.length) return items.reduce((sum, f) => sum + Number(f.sum || 0), 0);
-  return Number(extrasFor(empId).fines || 0);
+  return Number(extrasFor(empId).damage || 0);
 }
 
 function extrasFor(empId) {
@@ -360,9 +360,9 @@ function payout(empId) {
     c.eveningWeekday * state.rates.eveningWeekday +
     c.eveningWeekend * state.rates.eveningWeekend +
     c.intern * state.rates.intern -
-    fineTotal(empId) -
+    Number(extra.fines || 0) -
     Number(extra.advances || 0) -
-    Number(extra.damage || 0)
+    damageTotal(empId)
   );
 }
 
@@ -428,9 +428,9 @@ function renderPay() {
         <td>${c.eveningWeekday}</td>
         <td>${c.eveningWeekend}</td>
         <td>${c.intern}</td>
-        <td>${formatSum(fineTotal(emp.id))}</td>
+        <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.fines || 0}" data-emp-extra="${emp.id}" data-field="fines"></td>
         <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.advances || 0}" data-emp-extra="${emp.id}" data-field="advances"></td>
-        <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.damage || 0}" data-emp-extra="${emp.id}" data-field="damage"></td>
+        <td>${formatSum(damageTotal(emp.id))}</td>
         <td class="sum">${formatSum(payout(emp.id))}</td>
       </tr>
     `;
@@ -472,7 +472,7 @@ function renderFines() {
   fillDatalist("#fineWhatList", ensureInventory().map((item) => item.name));
 
   if (!rows.length) {
-    $("#fineList").innerHTML = `<p class="empty">Штрафов за ${days[0].getDate()}–${days[days.length - 1].getDate()} число пока нет</p>`;
+    $("#fineList").innerHTML = `<p class="empty">Порчи за ${days[0].getDate()}–${days[days.length - 1].getDate()} число пока нет</p>`;
     return;
   }
   $("#fineList").innerHTML = rows.map((f) => {
@@ -641,7 +641,7 @@ function renderInventoryStock() {
             <th class="name">Позиция</th>
             <th>Изначально</th>
             <th>Приход</th>
-            <th>Штрафы</th>
+            <th>Порча</th>
             <th>Сейчас</th>
             <th></th>
           </tr>
@@ -669,7 +669,7 @@ function renderInventoryStock() {
       <input type="text" name="name" placeholder="Добавить позицию, например колба" required>
       <button type="submit" class="primary compact">+</button>
     </form>
-    <p class="hint">Изначально — сколько было на точке. Приход и штрафы за колбу/чашу считаются сами.</p>
+    <p class="hint">Изначально — сколько было на точке. Приход и порча (колба, чаша) считаются сами.</p>
   `;
 }
 
@@ -799,7 +799,7 @@ $("#fineForm").addEventListener("submit", (e) => {
     qty: Number(data.qty || 1),
     sum: Number(data.sum || 0),
   });
-  extrasFor(data.empId).fines = 0;
+  extrasFor(data.empId).damage = 0;
   save();
   e.target.reset();
   setTodayDefaults();
