@@ -75,7 +75,7 @@ const INCOME = {
     title: "Приход инвентаря",
     hint: "Чаши, щипцы, шланги и другое",
     name: "Наименование",
-    placeholder: "Щипцы, чаша, шланг",
+    placeholder: "Колба, чаша, шланг",
     qty: "Количество, шт",
     unit: "шт",
     qtyStat: "Штук",
@@ -106,6 +106,13 @@ function uid() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function defaultInventory() {
+  return [
+    { id: uid(), name: "Колба", start: 0 },
+    { id: uid(), name: "Чаша", start: 0 },
+  ];
+}
+
 function defaultChecklist(venueId) {
   const items = venueId === "shishka"
     ? ["Classic", "Premium", "Smoke brush", "Smoke brush"]
@@ -126,6 +133,8 @@ function emptyState(venueId = "tangiers") {
     tobacco: [],
     revisions: [],
     checklist: defaultChecklist(venueId),
+    inventoryStock: defaultInventory(),
+    fines: [],
   };
 }
 
@@ -139,6 +148,8 @@ function normalizeVenue(data, venueId) {
     rates: { ...DEFAULT_RATES, ...(data.rates || {}) },
     tobacco: data.tobacco || [],
     revisions: data.revisions || [],
+    inventoryStock: data.inventoryStock?.length ? data.inventoryStock : base.inventoryStock,
+    fines: data.fines || [],
     checklist: data.checklist?.items
       ? {
           tableNo: data.checklist.tableNo || "20",
@@ -271,6 +282,52 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;");
 }
 
+function inCurrentPeriod(iso) {
+  if (!iso) return false;
+  const d = parseISODate(iso);
+  const days = periodDays();
+  return d >= days[0] && d <= days[days.length - 1];
+}
+
+function ensureInventory() {
+  if (!Array.isArray(state.inventoryStock) || !state.inventoryStock.length) {
+    state.inventoryStock = defaultInventory();
+  }
+  if (!Array.isArray(state.fines)) state.fines = [];
+  return state.inventoryStock;
+}
+
+function ensureStockItem(name) {
+  const stock = ensureInventory();
+  const found = stock.find((item) => item.name.toLowerCase() === name.toLowerCase());
+  if (found) return found;
+  const created = { id: uid(), name, start: 0 };
+  stock.push(created);
+  return created;
+}
+
+function incomingQtyFor(name) {
+  return (state.tobacco || [])
+    .filter((t) => (t.kind || "tobacco") === "inventory" && t.product.toLowerCase() === name.toLowerCase())
+    .reduce((sum, t) => sum + Number(t.qty || 0), 0);
+}
+
+function fineQtyFor(name) {
+  return (state.fines || [])
+    .filter((f) => f.what.toLowerCase() === name.toLowerCase())
+    .reduce((sum, f) => sum + Number(f.qty || 0), 0);
+}
+
+function finesForEmp(empId) {
+  return (state.fines || []).filter((f) => f.empId === empId && inCurrentPeriod(f.date));
+}
+
+function fineTotal(empId) {
+  const items = finesForEmp(empId);
+  if (items.length) return items.reduce((sum, f) => sum + Number(f.sum || 0), 0);
+  return Number(extrasFor(empId).fines || 0);
+}
+
 function extrasFor(empId) {
   const key = monthKey(viewMonth);
   if (!state.extras[key]) state.extras[key] = {};
@@ -303,7 +360,7 @@ function payout(empId) {
     c.eveningWeekday * state.rates.eveningWeekday +
     c.eveningWeekend * state.rates.eveningWeekend +
     c.intern * state.rates.intern -
-    Number(extra.fines || 0) -
+    fineTotal(empId) -
     Number(extra.advances || 0) -
     Number(extra.damage || 0)
   );
@@ -371,7 +428,7 @@ function renderPay() {
         <td>${c.eveningWeekday}</td>
         <td>${c.eveningWeekend}</td>
         <td>${c.intern}</td>
-        <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.fines || 0}" data-emp-extra="${emp.id}" data-field="fines"></td>
+        <td>${formatSum(fineTotal(emp.id))}</td>
         <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.advances || 0}" data-emp-extra="${emp.id}" data-field="advances"></td>
         <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.damage || 0}" data-emp-extra="${emp.id}" data-field="damage"></td>
         <td class="sum">${formatSum(payout(emp.id))}</td>
@@ -399,11 +456,48 @@ function renderPay() {
   `;
 }
 
+function renderFines() {
+  const days = periodDays();
+  const rows = (state.fines || [])
+    .filter((f) => inCurrentPeriod(f.date))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const empSelect = $("#fineEmpSelect");
+  if (empSelect) {
+    empSelect.innerHTML = state.employees
+      .map((emp) => `<option value="${emp.id}">${escapeHtml(emp.name)}</option>`)
+      .join("");
+  }
+  const dateInput = document.querySelector('#fineForm [name="date"]');
+  if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
+  fillDatalist("#fineWhatList", ensureInventory().map((item) => item.name));
+
+  if (!rows.length) {
+    $("#fineList").innerHTML = `<p class="empty">Штрафов за ${days[0].getDate()}–${days[days.length - 1].getDate()} число пока нет</p>`;
+    return;
+  }
+  $("#fineList").innerHTML = rows.map((f) => {
+    const emp = state.employees.find((e) => e.id === f.empId);
+    return `
+      <article class="card item">
+        <div class="item-head">
+          <h3>${escapeHtml(emp?.name || "Сотрудник")}</h3>
+          <button type="button" class="danger" data-del-fine="${f.id}">Удалить</button>
+        </div>
+        <p class="meta">
+          ${parseISODate(f.date).toLocaleDateString("ru-RU")} · ${escapeHtml(f.what)} · ${f.qty} шт
+          · ${formatSum(f.sum)}
+        </p>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderShifts() {
   renderPeriod();
   renderRates();
   renderRoster();
   renderPay();
+  renderFines();
 }
 
 function cycleCell(btn) {
@@ -425,6 +519,8 @@ function cycleCell(btn) {
 function setTodayDefaults() {
   const today = toISODate(new Date());
   document.querySelector('#tobaccoForm [name="date"]').value = today;
+  const fineDate = document.querySelector('#fineForm [name="date"]');
+  if (fineDate) fineDate.value = today;
   if (!$("#revisionDate").value) $("#revisionDate").value = today;
 }
 
@@ -521,9 +617,60 @@ function renderTobacco() {
   }
 
   const names = unique(incomingRows(), "product");
-  const extras = incomingKind === "tobacco" ? DEFAULT_BRANDS : [];
+  const extras = incomingKind === "tobacco" ? DEFAULT_BRANDS : incomingKind === "inventory"
+    ? ensureInventory().map((item) => item.name)
+    : [];
   fillDatalist("#productsList", [...new Set([...extras, ...names])]);
   fillDatalist("#suppliersList", unique(incomingRows(), "supplier"));
+  renderInventoryStock();
+}
+
+function renderInventoryStock() {
+  const box = $("#inventoryStock");
+  if (!box) return;
+  const show = incomingKind === "inventory";
+  box.hidden = !show;
+  if (!show) return;
+  const stock = ensureInventory();
+  box.innerHTML = `
+    <h2 class="block-title">Остатки инвентаря</h2>
+    <div class="excel-card">
+      <table class="pay stock-table">
+        <thead>
+          <tr>
+            <th class="name">Позиция</th>
+            <th>Изначально</th>
+            <th>Приход</th>
+            <th>Штрафы</th>
+            <th>Сейчас</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${stock.map((item) => {
+            const income = incomingQtyFor(item.name);
+            const fines = fineQtyFor(item.name);
+            const now = Number(item.start || 0) + income - fines;
+            return `
+              <tr>
+                <th class="name">${escapeHtml(item.name)}</th>
+                <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" data-stock-start="${item.id}"></td>
+                <td>${income}</td>
+                <td>${fines}</td>
+                <td class="sum">${now}</td>
+                <td><button type="button" class="danger" data-del-stock="${item.id}">Удалить</button></td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+    <form class="add-brand" id="addStockForm">
+      <input type="text" name="name" placeholder="Добавить позицию, например колба" required>
+      <button type="submit" class="primary compact">+</button>
+    </form>
+    <p class="hint">Изначально — сколько было на точке. Приход и штрафы за колбу/чашу считаются сами.</p>
+  `;
 }
 
 function ensureChecklist() {
@@ -638,6 +785,28 @@ $("#payWrap").addEventListener("input", (e) => {
   if (row) row.querySelector(".sum").textContent = formatSum(payout(empId));
 });
 
+$("#fineForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const what = data.what.trim();
+  ensureStockItem(what);
+  if (!Array.isArray(state.fines)) state.fines = [];
+  state.fines.push({
+    id: uid(),
+    empId: data.empId,
+    date: data.date,
+    what,
+    qty: Number(data.qty || 1),
+    sum: Number(data.sum || 0),
+  });
+  extrasFor(data.empId).fines = 0;
+  save();
+  e.target.reset();
+  setTodayDefaults();
+  renderShifts();
+  if (incomingKind === "inventory") renderInventoryStock();
+});
+
 $("#addEmployeeForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const name = new FormData(e.target).get("name").trim();
@@ -697,11 +866,14 @@ $("#incomeKindSelect").addEventListener("change", (e) => {
 $("#tobaccoForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
+  const kind = data.kind || incomingKind;
+  const product = data.product.trim();
+  if (kind === "inventory") ensureStockItem(product);
   state.tobacco.push({
     id: uid(),
-    kind: data.kind || incomingKind,
+    kind,
     date: data.date,
-    product: data.product.trim(),
+    product,
     supplier: data.supplier.trim(),
     qty: Number(data.qty),
     sum: Number(data.sum || 0),
@@ -720,6 +892,42 @@ document.addEventListener("click", (e) => {
     save();
     renderTobacco();
   }
+  const fineId = e.target.dataset.delFine;
+  if (fineId) {
+    state.fines = (state.fines || []).filter((f) => f.id !== fineId);
+    save();
+    renderShifts();
+    if (incomingKind === "inventory") renderInventoryStock();
+  }
+  const stockId = e.target.dataset.delStock;
+  if (stockId) {
+    state.inventoryStock = ensureInventory().filter((item) => item.id !== stockId);
+    save();
+    renderInventoryStock();
+  }
+});
+
+document.addEventListener("input", (e) => {
+  const stockId = e.target.dataset.stockStart;
+  if (!stockId) return;
+  const item = ensureInventory().find((row) => row.id === stockId);
+  if (!item) return;
+  item.start = Number(e.target.value || 0);
+  save();
+  const income = incomingQtyFor(item.name);
+  const fines = fineQtyFor(item.name);
+  const cell = e.target.closest("tr")?.querySelector(".sum");
+  if (cell) cell.textContent = String(item.start + income - fines);
+});
+
+document.addEventListener("submit", (e) => {
+  if (e.target.id !== "addStockForm") return;
+  e.preventDefault();
+  const name = new FormData(e.target).get("name").trim();
+  if (!name) return;
+  ensureStockItem(name);
+  save();
+  renderInventoryStock();
 });
 
 $("#copiesInput").addEventListener("input", (e) => {

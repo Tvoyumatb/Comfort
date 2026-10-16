@@ -648,6 +648,10 @@ input[type="number"] {
   font-weight: 800;
 }
 
+.stock-table input {
+  min-width: 64px;
+}
+
 .a4-page {
   background: #2a2a2a;
   padding: 8px;
