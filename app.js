@@ -8,6 +8,7 @@ const VENUES = {
 
 const DEFAULT_GRAMS_PER_HOOKAH = 25;
 const DEFAULT_COALS_PER_HOOKAH = 5;
+const DEFAULT_COALS_PER_PACK = 72;
 const OPENING_DATE = "2026-10-01";
 const OPENING_STOCK = [
   { name: "Классик", grams: 32529 },
@@ -104,10 +105,10 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Приход в штуках. С каждого кальяна списывается 5 шт",
+    hint: "Пишите пачки: в пачке 72 шт, они сами попадут в остаток углей",
     name: "Наименование",
-    placeholder: "Кокосовый уголь",
-    qty: "Количество, шт",
+    placeholder: "Уголь",
+    qty: "Пачек",
     unit: "шт",
     qtyStat: "Штук",
     empty: "Прихода угля пока нет",
@@ -159,6 +160,7 @@ function emptyState(venueId = "tangiers") {
     hookahSales: [],
     gramsPerHookah: DEFAULT_GRAMS_PER_HOOKAH,
     coalsPerHookah: DEFAULT_COALS_PER_HOOKAH,
+    coalsPerPack: DEFAULT_COALS_PER_PACK,
     consumptionV1: true,
   };
 }
@@ -168,10 +170,12 @@ function applyConsumption(data) {
   if (!data.consumptionV1) {
     data.gramsPerHookah = DEFAULT_GRAMS_PER_HOOKAH;
     data.coalsPerHookah = DEFAULT_COALS_PER_HOOKAH;
+    data.coalsPerPack = DEFAULT_COALS_PER_PACK;
     data.consumptionV1 = true;
   } else {
     data.gramsPerHookah = Math.max(1, Number(data.gramsPerHookah) || DEFAULT_GRAMS_PER_HOOKAH);
     data.coalsPerHookah = Math.max(0, Number(data.coalsPerHookah) || DEFAULT_COALS_PER_HOOKAH);
+    data.coalsPerPack = Math.max(1, Number(data.coalsPerPack) || DEFAULT_COALS_PER_PACK);
   }
   return data;
 }
@@ -217,6 +221,7 @@ function normalizeVenue(data, venueId) {
     hookahSales: data.hookahSales || [],
     gramsPerHookah: Number(data.gramsPerHookah) || DEFAULT_GRAMS_PER_HOOKAH,
     coalsPerHookah: Number(data.coalsPerHookah) || DEFAULT_COALS_PER_HOOKAH,
+    coalsPerPack: Number(data.coalsPerPack) || DEFAULT_COALS_PER_PACK,
     consumptionV1: Boolean(data.consumptionV1),
     checklist: data.checklist?.items
       ? {
@@ -598,6 +603,8 @@ function setTodayDefaults() {
   if (!$("#revisionDate").value) $("#revisionDate").value = OPENING_DATE;
   const saleDate = document.querySelector('#saleForm [name="date"]');
   if (saleDate) saleDate.value = today;
+  const coalDate = document.querySelector('#coalForm [name="date"]');
+  if (coalDate) coalDate.value = today;
 }
 
 function ensureRevision(date) {
@@ -626,6 +633,41 @@ function gramsPerHookah() {
 
 function coalsPerHookah() {
   return Math.max(0, Number(state.coalsPerHookah) || DEFAULT_COALS_PER_HOOKAH);
+}
+
+function coalsPerPack() {
+  return Math.max(1, Number(state.coalsPerPack) || DEFAULT_COALS_PER_PACK);
+}
+
+function addCoalIncome({ date, packs, perPack, note, sum, supplier }) {
+  const packCount = Math.max(1, Number(packs || 1));
+  const inPack = Math.max(1, Number(perPack || coalsPerPack()));
+  state.tobacco.push({
+    id: uid(),
+    kind: "coal",
+    date,
+    product: "Уголь",
+    packs: packCount,
+    perPack: inPack,
+    qty: packCount * inPack,
+    supplier: supplier || "",
+    sum: Number(sum || 0),
+    note: note || `${packCount} пач. × ${inPack} шт`,
+  });
+}
+
+function coalRows(fromDate) {
+  return (state.tobacco || [])
+    .filter((row) => row.kind === "coal" && (!fromDate || inRevisionWindow(row.date, fromDate)))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+}
+
+function coalMeta(row) {
+  const packs = Number(row.packs || 0);
+  const perPack = Number(row.perPack || 0);
+  const pieces = Number(row.qty || 0);
+  if (packs > 0) return `${formatGrams(packs)} пач. × ${formatGrams(perPack || coalsPerPack())} = ${formatGrams(pieces)} шт`;
+  return `${formatGrams(pieces)} шт`;
 }
 
 function normalizeName(name) {
@@ -707,7 +749,7 @@ function soldHookahsTotal(fromDate) {
 function incomeCoals(fromDate) {
   return (state.tobacco || [])
     .filter((row) => row.kind === "coal"
-      && row.date > fromDate
+      && row.date >= fromDate
       && row.date < nextRevisionDate(fromDate))
     .reduce((sum, row) => sum + Number(row.qty || 0), 0);
 }
@@ -743,6 +785,10 @@ function renderRevision() {
   if (coalsUseInput && document.activeElement !== coalsUseInput) {
     coalsUseInput.value = coalsPerHookah();
   }
+  const packInput = document.querySelector('#coalForm [name="perPack"]');
+  if (packInput && document.activeElement !== packInput) {
+    packInput.value = coalsPerPack();
+  }
   const snap = rev.date;
   const remainTotal = SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, snap), 0);
   const coalsNow = remainCoals(rev, snap);
@@ -776,6 +822,24 @@ function renderRevision() {
   const sales = [...state.hookahSales]
     .filter((sale) => inRevisionWindow(sale.date, snap))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const coals = coalRows(snap);
+  const coalList = $("#coalIncomeList");
+  if (coalList) {
+    if (!coals.length) {
+      coalList.innerHTML = `<p class="empty">Пачек угля пока не добавляли — остаток считается от снятия</p>`;
+    } else {
+      coalList.innerHTML = coals.map((row) => `
+        <article class="card item">
+          <div class="item-head">
+            <h3>${escapeHtml(coalMeta(row))}</h3>
+            <button type="button" class="danger" data-del-tobacco="${row.id}">Удалить</button>
+          </div>
+          <p class="meta">${parseISODate(row.date).toLocaleDateString("ru-RU")}${row.note ? ` · ${escapeHtml(row.note)}` : ""}</p>
+        </article>
+      `).join("");
+    }
+  }
+
   if (!sales.length) {
     $("#salesList").innerHTML = `<p class="empty">Жмите 1 Классик, 2 Премиум или 3 Tangiers — с остатка группы спишется само</p>`;
   } else {
@@ -818,9 +882,13 @@ function syncIncomeForm() {
   const stockSelect = $("#stockProductSelect");
   const productInput = document.querySelector('#tobaccoForm [name="product"]');
   const isInventory = incomingKind === "inventory";
+  const isCoal = incomingKind === "coal";
   if (stockWrap) stockWrap.hidden = !isInventory;
   if (freeWrap) freeWrap.hidden = isInventory;
-  if (productInput) productInput.required = !isInventory;
+  if (productInput) {
+    productInput.required = !isInventory && !isCoal;
+    if (isCoal && !productInput.value) productInput.value = "Уголь";
+  }
   if (stockSelect) {
     stockSelect.required = isInventory;
     const stock = ensureInventory();
@@ -862,7 +930,7 @@ function renderTobacco() {
           <button type="button" class="danger" data-del-tobacco="${t.id}">Удалить</button>
         </div>
         <p class="meta">
-          ${parseISODate(t.date).toLocaleDateString("ru-RU")} · ${formatGrams(t.qty)} ${meta.unit}
+          ${parseISODate(t.date).toLocaleDateString("ru-RU")} · ${incomingKind === "coal" ? coalMeta(t) : `${formatGrams(t.qty)} ${meta.unit}`}
           ${t.sum ? ` · ${formatSum(t.sum)}` : ""}
           ${t.supplier ? `<br>${escapeHtml(t.supplier)}` : ""}
           ${t.note ? `<br>${escapeHtml(t.note)}` : ""}
@@ -1131,6 +1199,23 @@ $("#coalsPerHookah").addEventListener("input", (e) => {
   renderRevision();
 });
 
+$("#coalForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const perPack = Math.max(1, Number(data.perPack || coalsPerPack()));
+  state.coalsPerPack = perPack;
+  addCoalIncome({
+    date: data.date || toISODate(new Date()),
+    packs: data.packs,
+    perPack,
+    note: (data.note || "").trim(),
+  });
+  save();
+  e.target.reset();
+  setTodayDefaults();
+  renderRevision();
+});
+
 $("#saleButtons").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-sale-group]");
   if (!btn) return;
@@ -1165,26 +1250,39 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const kind = data.kind || incomingKind;
-  let product = (data.stockProduct || data.product || "").trim();
-  if (kind === "inventory") {
-    if (!product) return;
-    product = ensureStockItem(product).name;
+  if (kind === "coal") {
+    addCoalIncome({
+      date: data.date,
+      packs: data.qty,
+      perPack: coalsPerPack(),
+      note: (data.note || "").trim(),
+      sum: data.sum,
+      supplier: (data.supplier || "").trim(),
+    });
+  } else {
+    let product = (data.stockProduct || data.product || "").trim();
+    if (kind === "inventory") {
+      if (!product) return;
+      product = ensureStockItem(product).name;
+    }
+    if (kind === "tobacco" && !product) return;
+    state.tobacco.push({
+      id: uid(),
+      kind,
+      date: data.date,
+      product,
+      supplier: (data.supplier || "").trim(),
+      qty: Number(data.qty),
+      sum: Number(data.sum || 0),
+      note: (data.note || "").trim(),
+    });
   }
-  state.tobacco.push({
-    id: uid(),
-    kind,
-    date: data.date,
-    product,
-    supplier: data.supplier.trim(),
-    qty: Number(data.qty),
-    sum: Number(data.sum || 0),
-    note: data.note.trim(),
-  });
   save();
   e.target.reset();
   incomingKind = kind;
   setTodayDefaults();
   renderTobacco();
+  renderRevision();
 });
 
 document.addEventListener("click", (e) => {
@@ -1199,6 +1297,7 @@ document.addEventListener("click", (e) => {
     state.tobacco = state.tobacco.filter((t) => t.id !== tobaccoId);
     save();
     renderTobacco();
+    renderRevision();
   }
   const fineId = e.target.dataset.delFine;
   if (fineId) {
