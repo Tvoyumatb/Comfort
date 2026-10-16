@@ -918,8 +918,10 @@ function todayISO() {
 }
 
 function daysOpenInWindow(fromDate) {
-  const start = parseISODate(fromDate);
   const cap = parseISODate(todayISO());
+  const monthStart = new Date(cap.getFullYear(), cap.getMonth(), 1);
+  const windowStart = parseISODate(fromDate);
+  const start = windowStart > monthStart ? windowStart : monthStart;
   const until = parseISODate(nextRevisionDate(fromDate));
   until.setDate(until.getDate() - 1);
   const end = cap < until ? cap : until;
@@ -1214,7 +1216,7 @@ function renderRevision() {
     staffBox.hidden = !staffOnly;
     staffBox.innerHTML = staffOnly ? `
       <h2>Стафф кальяны</h2>
-      <p class="hint">Только Tangiers. Каждый день ${staffPerDay()} классик с ${parseISODate(OPENING_DATE).toLocaleDateString("ru-RU")}. За это снятие: ${staffDays} дн. × ${staffPerDay()} = ${staffHookahs} кальянов (−${formatGrams(staffHookahs * gramsPerHookah())} г и −${formatGrams(staffHookahs * coalsPerHookah())} шт угля).</p>
+      <p class="hint">Только Tangiers. Стафф в реальном времени: сегодня ${new Date().getDate()} число — за ${staffDays} дн. этого месяца × ${staffPerDay()} классик = ${staffHookahs} кальянов (−${formatGrams(staffHookahs * gramsPerHookah())} г и −${formatGrams(staffHookahs * coalsPerHookah())} шт угля).</p>
     ` : "";
   }
   const staffInputWrap = $("#staffPerDay")?.closest("label");
