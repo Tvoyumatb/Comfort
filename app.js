@@ -93,9 +93,9 @@ const INCOME = {
   },
   inventory: {
     title: "Приход инвентаря",
-    hint: "Приход привязан к остаткам: изначально + дозакупка − порча",
+    hint: "Чаши — отдельным списком: добавь название вида, потом дозакупку",
     name: "Наименование",
-    placeholder: "Колба, чаша, шланг",
+    placeholder: "Колба, шланг",
     qty: "Количество, шт",
     unit: "шт",
     qtyStat: "Штук",
@@ -103,9 +103,9 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Пишите пачки: в пачке 72 шт, они сами попадут в остаток углей",
-    name: "Наименование",
-    placeholder: "Уголь",
+    hint: "Сначала добавь название угля, потом пачки. В пачке 72 шт",
+    name: "Название угля",
+    placeholder: "CocoNara, Tom Coco...",
     qty: "Пачек",
     unit: "шт",
     qtyStat: "Штук",
@@ -134,10 +134,14 @@ function isMouthpiece(name) {
 
 function defaultInventory() {
   return [
-    { id: uid(), name: "Колба", start: 0 },
-    { id: uid(), name: "Чаша", start: 0 },
-    { id: uid(), name: "Мундштуки одноразовые", start: 0 },
+    { id: uid(), name: "Колба", start: 0, kind: "item" },
+    { id: uid(), name: "Мундштуки одноразовые", start: 0, kind: "item" },
   ];
+}
+
+function stockKind(item) {
+  if (item?.kind === "bowl" || item?.kind === "item") return item.kind;
+  return /чаш/i.test(item?.name || "") ? "bowl" : "item";
 }
 
 function defaultChecklist(venueId) {
@@ -161,6 +165,7 @@ function emptyState(venueId = "tangiers") {
     revisions: [],
     checklist: defaultChecklist(venueId),
     inventoryStock: defaultInventory(),
+    coalStock: [],
     fines: [],
     hookahSales: [],
     gramsPerHookah: DEFAULT_GRAMS_PER_HOOKAH,
@@ -201,6 +206,7 @@ function resetStock(data, venueId) {
   data.hookahSales = [];
   data.revisions = [emptyOpening(venueId)];
   data.inventoryStock = defaultInventory();
+  data.coalStock = [];
   data.openingV1 = true;
   data.shishkaOpenV2 = true;
   data.invoicesV1 = true;
@@ -223,6 +229,7 @@ function normalizeVenue(data, venueId) {
     tobacco: data.tobacco || [],
     revisions: data.revisions || [],
     inventoryStock: data.inventoryStock?.length ? data.inventoryStock : base.inventoryStock,
+    coalStock: Array.isArray(data.coalStock) ? data.coalStock : [],
     fines: data.fines || [],
     hookahSales: data.hookahSales || [],
     gramsPerHookah: Number(data.gramsPerHookah) || DEFAULT_GRAMS_PER_HOOKAH,
@@ -383,12 +390,40 @@ function ensureInventory() {
   if (!Array.isArray(state.inventoryStock) || !state.inventoryStock.length) {
     state.inventoryStock = defaultInventory();
   }
+  state.inventoryStock.forEach((item) => {
+    item.kind = stockKind(item);
+  });
   if (!Array.isArray(state.fines)) state.fines = [];
   return state.inventoryStock;
 }
 
-function ensureStockItem(name) {
+function ensureCoalStock() {
+  if (!Array.isArray(state.coalStock)) state.coalStock = [];
+  (state.tobacco || [])
+    .filter((row) => row.kind === "coal" && (row.product || "").trim())
+    .forEach((row) => {
+      const name = row.product.trim();
+      if (!state.coalStock.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
+        state.coalStock.push({ id: uid(), name, start: 0 });
+      }
+    });
+  return state.coalStock;
+}
+
+function ensureStockItem(name, kind = "item") {
   const stock = ensureInventory();
+  const found = stock.find((item) => item.name.toLowerCase() === name.toLowerCase());
+  if (found) {
+    if (!found.kind) found.kind = kind;
+    return found;
+  }
+  const created = { id: uid(), name, start: 0, kind };
+  stock.push(created);
+  return created;
+}
+
+function ensureCoalItem(name) {
+  const stock = ensureCoalStock();
   const found = stock.find((item) => item.name.toLowerCase() === name.toLowerCase());
   if (found) return found;
   const created = { id: uid(), name, start: 0 };
@@ -396,9 +431,9 @@ function ensureStockItem(name) {
   return created;
 }
 
-function incomingQtyFor(name) {
+function incomingQtyFor(name, kind = "inventory") {
   return (state.tobacco || [])
-    .filter((t) => (t.kind || "tobacco") === "inventory" && t.product.toLowerCase() === name.toLowerCase())
+    .filter((t) => (t.kind || "tobacco") === kind && t.product.toLowerCase() === name.toLowerCase())
     .reduce((sum, t) => sum + Number(t.qty || 0), 0);
 }
 
@@ -650,14 +685,16 @@ function coalsPerPack() {
   return Math.max(1, Number(state.coalsPerPack) || DEFAULT_COALS_PER_PACK);
 }
 
-function addCoalIncome({ date, packs, perPack, note, sum, supplier }) {
+function addCoalIncome({ date, packs, perPack, note, sum, supplier, product }) {
   const packCount = Math.max(1, Number(packs || 1));
   const inPack = Math.max(1, Number(perPack || coalsPerPack()));
+  const name = (product || "").trim() || "Уголь";
+  ensureCoalItem(name);
   state.tobacco.push({
     id: uid(),
     kind: "coal",
     date,
-    product: "Уголь",
+    product: name,
     packs: packCount,
     perPack: inPack,
     qty: packCount * inPack,
@@ -779,6 +816,20 @@ function stockNow(item) {
   return Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
 }
 
+function coalNow(item) {
+  return Number(item.start || 0) + incomingQtyFor(item.name, "coal");
+}
+
+function namedCoalOpening() {
+  return ensureCoalStock().reduce((sum, item) => sum + Number(item.start || 0), 0);
+}
+
+function syncOpeningCoals() {
+  const opening = (state.revisions || []).find((rev) => rev.date === OPENING_DATE);
+  if (!opening || !ensureCoalStock().length) return;
+  opening.coals = namedCoalOpening();
+}
+
 function stockUnit(item) {
   return isMouthpiece(item.name) ? "пач." : "шт";
 }
@@ -821,6 +872,19 @@ function renderRevision() {
   const exact = (state.revisions || []).find((row) => row.date === date && !isEmptyRevision(row));
   const rev = exact || latestRevision(date) || ensureRevision(OPENING_DATE);
   shownRevDate = rev.date;
+  const coalKinds = ensureCoalStock();
+  const coalKindRows = $("#coalKindRows");
+  if (coalKindRows) {
+    coalKindRows.innerHTML = coalKinds.map((item) => `
+      <label class="sheet-row coals coal-kind">
+        <span>${escapeHtml(item.name)} <small>сейчас ${formatGrams(coalNow(item))} шт</small></span>
+        <input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" data-coal-start="${item.id}">
+      </label>
+    `).join("");
+  }
+  const coalsInputRow = $("#coalsInputRow");
+  if (coalsInputRow) coalsInputRow.hidden = coalKinds.length > 0;
+  if (coalKinds.length) syncOpeningCoals();
   $("#coalsInput").value = rev.coals || 0;
   if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
   const gramsInput = $("#gramsPerHookah");
@@ -932,19 +996,22 @@ function syncIncomeForm() {
   }
   if (productInput) {
     productInput.required = false;
-    if (isCoal && !productInput.value) productInput.value = "Уголь";
   }
   if (stockSelect) {
     stockSelect.disabled = !isInventory;
     stockSelect.required = isInventory;
     const stock = ensureInventory();
     const current = stockSelect.value;
-    stockSelect.innerHTML = stock
-      .map((item) => {
-        const now = stockNow(item);
-        return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · сейчас ${now} ${stockUnit(item)}</option>`;
-      })
-      .join("");
+    const bowls = stock.filter((item) => stockKind(item) === "bowl");
+    const rest = stock.filter((item) => stockKind(item) !== "bowl");
+    const option = (item) => {
+      const now = stockNow(item);
+      return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · сейчас ${now} ${stockUnit(item)}</option>`;
+    };
+    stockSelect.innerHTML = `
+      ${bowls.length ? `<optgroup label="Чаши">${bowls.map(option).join("")}</optgroup>` : ""}
+      ${rest.length ? `<optgroup label="Остальное">${rest.map(option).join("")}</optgroup>` : ""}
+    `;
     if (current && [...stockSelect.options].some((opt) => opt.value === current)) {
       stockSelect.value = current;
     }
@@ -1047,21 +1114,96 @@ function renderTobacco() {
   const names = unique(incomingRows(), "product");
   const extras = incomingKind === "tobacco" ? DEFAULT_BRANDS : incomingKind === "inventory"
     ? ensureInventory().map((item) => item.name)
-    : [];
+    : ensureCoalStock().map((item) => item.name);
   fillDatalist("#productsList", [...new Set([...extras, ...names])]);
   fillDatalist("#suppliersList", unique(incomingRows(), "supplier"));
+  fillDatalist("#coalNamesList", ensureCoalStock().map((item) => item.name));
   renderInventoryStock();
+}
+
+function renderStockRows(items, { restockAttr, startAttr, delAttr, extraCols, colCount = 6 }) {
+  if (!items.length) {
+    return `<tr><td colspan="${colCount}" class="empty-row">Пока пусто — добавь название ниже</td></tr>`;
+  }
+  return items.map((item) => {
+    const extra = extraCols(item);
+    const now = extra.now;
+    return `
+      <tr class="${now <= 2 ? "low-stock" : ""}">
+        <th class="name">${escapeHtml(item.name)}</th>
+        <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" ${startAttr}="${item.id}"></td>
+        ${extra.mid}
+        <td class="sum">${now} ${extra.unit}</td>
+        <td>
+          <button type="button" class="ghost restock" ${restockAttr}="${escapeHtml(item.name)}">Дозакупить</button>
+          <button type="button" class="danger" ${delAttr}="${item.id}">Удалить</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
 }
 
 function renderInventoryStock() {
   const box = $("#inventoryStock");
   if (!box) return;
-  const show = incomingKind === "inventory";
+  const show = incomingKind === "inventory" || incomingKind === "coal";
   box.hidden = !show;
   if (!show) return;
+  if (incomingKind === "coal") {
+    const stock = ensureCoalStock();
+    box.innerHTML = `
+      <h2 class="block-title">Виды угля</h2>
+      <div class="excel-card">
+        <table class="pay stock-table">
+          <thead>
+            <tr>
+              <th class="name">Название</th>
+              <th>Изначально, шт</th>
+              <th>Приход, шт</th>
+              <th>Сейчас</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${renderStockRows(stock, {
+              restockAttr: "data-restock-coal",
+              startAttr: "data-coal-start",
+              delAttr: "data-del-coal-stock",
+              colCount: 5,
+              extraCols: (item) => {
+                const income = incomingQtyFor(item.name, "coal");
+                return {
+                  now: coalNow(item),
+                  unit: "шт",
+                  mid: `<td>${formatGrams(income)}</td>`,
+                };
+              },
+            })}
+          </tbody>
+        </table>
+      </div>
+      <form class="add-brand" id="addCoalStockForm">
+        <input type="text" name="name" placeholder="Добавить название угля" required>
+        <button type="submit" class="primary compact">+</button>
+      </form>
+      <p class="hint">Продажи кальянов минусуют общий остаток углей в ревизии. Здесь видно, сколько какого вида завезли.</p>
+    `;
+    return;
+  }
   const stock = ensureInventory();
-  box.innerHTML = `
-    <h2 class="block-title">Остатки инвентаря</h2>
+  const bowls = stock.filter((item) => stockKind(item) === "bowl");
+  const rest = stock.filter((item) => stockKind(item) !== "bowl");
+  const inventoryCols = (item) => {
+    const income = incomingQtyFor(item.name);
+    const fines = fineQtyFor(item.name);
+    return {
+      now: stockNow(item),
+      unit: stockUnit(item),
+      mid: `<td>${income}</td><td>${fines}</td>`,
+    };
+  };
+  const table = (title, items, placeholder, kind) => `
+    <h2 class="block-title">${title}</h2>
     <div class="excel-card">
       <table class="pay stock-table">
         <thead>
@@ -1075,31 +1217,23 @@ function renderInventoryStock() {
           </tr>
         </thead>
         <tbody>
-          ${stock.map((item) => {
-            const income = incomingQtyFor(item.name);
-            const fines = fineQtyFor(item.name);
-            const now = stockNow(item);
-            return `
-              <tr class="${now <= 2 ? "low-stock" : ""}">
-                <th class="name">${escapeHtml(item.name)}</th>
-                <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" data-stock-start="${item.id}"></td>
-                <td>${income}</td>
-                <td>${fines}</td>
-                <td class="sum">${now} ${stockUnit(item)}</td>
-                <td>
-                  <button type="button" class="ghost restock" data-restock="${escapeHtml(item.name)}">Дозакупить</button>
-                  <button type="button" class="danger" data-del-stock="${item.id}">Удалить</button>
-                </td>
-              </tr>
-            `;
-          }).join("")}
+          ${renderStockRows(items, {
+            restockAttr: "data-restock",
+            startAttr: "data-stock-start",
+            delAttr: "data-del-stock",
+            extraCols: inventoryCols,
+          })}
         </tbody>
       </table>
     </div>
-    <form class="add-brand" id="addStockForm">
-      <input type="text" name="name" placeholder="Добавить позицию, например колба" required>
+    <form class="add-brand add-stock-form" data-stock-kind="${kind}">
+      <input type="text" name="name" placeholder="${placeholder}" required>
       <button type="submit" class="primary compact">+</button>
     </form>
+  `;
+  box.innerHTML = `
+    ${table("Чаши", bowls, "Название чаши, например Solaris", "bowl")}
+    ${table("Остальной инвентарь", rest, "Добавить позицию, например колба", "item")}
     <p class="hint">Сейчас = изначально + приход − порча. Мундштуки считаются пачками и с кальянов не списываются.</p>
   `;
 }
@@ -1323,6 +1457,7 @@ $("#coalForm").addEventListener("submit", (e) => {
   state.coalsPerPack = perPack;
   addCoalIncome({
     date: data.date || toISODate(new Date()),
+    product: (data.product || "").trim(),
     packs: data.packs,
     perPack,
     sum: data.sum,
@@ -1507,35 +1642,80 @@ document.addEventListener("click", (e) => {
     if (qty) qty.focus();
     $("#tobaccoForm").scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  const restockCoal = e.target.dataset.restockCoal;
+  if (restockCoal) {
+    incomingKind = "coal";
+    renderTobacco();
+    const nameInput = document.querySelector('#coalForm [name="product"]');
+    if (nameInput) nameInput.value = restockCoal;
+    const packs = document.querySelector('#coalForm [name="packs"]');
+    if (packs) packs.focus();
+    $("#coalForm").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const stockId = e.target.dataset.delStock;
   if (stockId) {
     state.inventoryStock = ensureInventory().filter((item) => item.id !== stockId);
     save();
     renderInventoryStock();
+    renderTobacco();
+  }
+  const coalStockId = e.target.dataset.delCoalStock;
+  if (coalStockId) {
+    state.coalStock = ensureCoalStock().filter((item) => item.id !== coalStockId);
+    save();
+    renderInventoryStock();
+    renderTobacco();
   }
 });
 
 document.addEventListener("input", (e) => {
   const stockId = e.target.dataset.stockStart;
-  if (!stockId) return;
-  const item = ensureInventory().find((row) => row.id === stockId);
+  if (stockId) {
+    const item = ensureInventory().find((row) => row.id === stockId);
+    if (!item) return;
+    item.start = Number(e.target.value || 0);
+    save();
+    const cell = e.target.closest("tr")?.querySelector(".sum");
+    if (cell) cell.textContent = `${stockNow(item)} ${stockUnit(item)}`;
+    return;
+  }
+  const coalId = e.target.dataset.coalStart;
+  if (!coalId) return;
+  const item = ensureCoalStock().find((row) => row.id === coalId);
   if (!item) return;
   item.start = Number(e.target.value || 0);
+  syncOpeningCoals();
   save();
-  const income = incomingQtyFor(item.name);
-  const fines = fineQtyFor(item.name);
   const cell = e.target.closest("tr")?.querySelector(".sum");
-  if (cell) cell.textContent = String(item.start + income - fines);
+  if (cell) cell.textContent = `${formatGrams(coalNow(item))} шт`;
+  const remainEl = $("#coalsRemain");
+  if (remainEl) {
+    const rev = shownRevision();
+    const now = remainCoals(rev, rev?.date);
+    remainEl.textContent = `${formatGrams(now)} шт`;
+    remainEl.classList.toggle("low-stock", now <= 0);
+  }
 });
 
 document.addEventListener("submit", (e) => {
-  if (e.target.id !== "addStockForm") return;
+  if (e.target.id === "addCoalStockForm") {
+    e.preventDefault();
+    const name = new FormData(e.target).get("name").trim();
+    if (!name) return;
+    ensureCoalItem(name);
+    save();
+    e.target.reset();
+    renderTobacco();
+    return;
+  }
+  if (!e.target.classList.contains("add-stock-form")) return;
   e.preventDefault();
   const name = new FormData(e.target).get("name").trim();
   if (!name) return;
-  ensureStockItem(name);
+  ensureStockItem(name, e.target.dataset.stockKind || "item");
   save();
-  renderInventoryStock();
+  e.target.reset();
+  renderTobacco();
 });
 
 $("#copiesInput").addEventListener("input", (e) => {

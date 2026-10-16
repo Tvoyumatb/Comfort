@@ -863,6 +863,16 @@ input[type="number"] {
   color: #c45c4a;
 }
 
+.stock-table .empty-row {
+  text-align: left;
+  color: #666;
+  font-weight: 500;
+}
+
+.sheet-row.coal-kind {
+  border-left: 5px solid var(--coal);
+}
+
 .a4-page {
   background: #2a2a2a;
   padding: 8px;

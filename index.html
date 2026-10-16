@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=24">
+  <link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
   <header class="topbar no-print">
@@ -120,7 +120,8 @@
           <span>Сейчас с учётом продаж</span>
           <strong id="revisionRemain">0</strong>
         </div>
-        <label class="sheet-row coals">
+        <div id="coalKindRows"></div>
+        <label class="sheet-row coals" id="coalsInputRow">
           <span>Угли на снятии</span>
           <input type="number" id="coalsInput" min="0" step="1" inputmode="numeric">
         </label>
@@ -128,10 +129,10 @@
           <span>Сейчас углей</span>
           <strong id="coalsRemain">0 шт</strong>
         </div>
-        <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Впиши штуки на 01.10, а новые пачки — во вкладке Приход → Уголь.</p>
+        <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Добавь название угля и штуки, либо пачки во вкладке Приход → Уголь.</p>
         <button type="button" class="ghost" id="snapshotBtn">Зафиксировать снятие на выбранную дату</button>
       </div>
-      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака и 5 шт угля. Пачки угля добавляй в Приходе.</p>
+      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака и 5 шт угля. Названия чаш и углей добавляются в Приходе.</p>
 
       <form class="card form" id="saleForm">
         <h2>Продажи кальянов за день</h2>
@@ -218,7 +219,11 @@
 
       <form class="card form" id="coalForm" hidden>
         <h2>Добавить уголь</h2>
-        <p class="hint">Пачка — 72 шт. Они плюсуются к «Сейчас углей» в ревизии.</p>
+        <p class="hint">Выбери или впиши название угля. Пачка — 72 шт, они плюсуются к остатку в ревизии.</p>
+        <label>Название угля
+          <input type="text" name="product" list="coalNamesList" placeholder="Например CocoNara" required>
+        </label>
+        <datalist id="coalNamesList"></datalist>
         <label>Дата
           <span class="date-wrap">
             <input type="date" name="date" required>
@@ -271,6 +276,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=24"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>
