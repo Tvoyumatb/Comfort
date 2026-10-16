@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
 </head>
 <body>
   <header class="topbar no-print">
@@ -132,7 +132,45 @@
         <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Добавь название угля и штуки, либо пачки во вкладке Приход → Уголь.</p>
         <button type="button" class="ghost" id="snapshotBtn">Зафиксировать снятие на выбранную дату</button>
       </div>
-      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака и 5 шт угля. Названия чаш и углей добавляются в Приходе.</p>
+      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян: 25 г табака и 5 шт угля. Стафф: 2 классика каждый день. Шеф и продажи за месяц вписываются отдельно.</p>
+
+      <div class="card sheet" id="staffBox"></div>
+
+      <form class="card form" id="chefForm">
+        <h2>Шеф кальяны</h2>
+        <p class="hint">Каждый день своё число. Списывается только с классика.</p>
+        <div class="row">
+          <label>Дата
+            <span class="date-wrap">
+              <input type="date" name="date" required>
+            </span>
+          </label>
+          <label>Сколько выкурили
+            <input type="number" name="hookahs" min="1" step="1" value="1" required>
+          </label>
+        </div>
+        <button type="submit" class="primary">Списать шеф</button>
+      </form>
+
+      <form class="card form" id="monthSaleForm">
+        <h2>Продажи за месяц</h2>
+        <p class="hint">Можно скинуть общие цифры за месяц — спишется само. Стафф и шеф сюда не входят.</p>
+        <label>Месяц
+          <input type="month" name="month" required>
+        </label>
+        <div class="row">
+          <label>Классик, шт
+            <input type="number" name="classic" min="0" step="1" value="0">
+          </label>
+          <label>Премиум, шт
+            <input type="number" name="premium" min="0" step="1" value="0">
+          </label>
+        </div>
+        <label id="monthTangiersWrap">Tangiers, шт
+          <input type="number" name="tangiers" min="0" step="1" value="0">
+        </label>
+        <button type="submit" class="primary">Списать продажи месяца</button>
+      </form>
 
       <form class="card form" id="saleForm">
         <h2>Продажи кальянов за день</h2>
@@ -144,6 +182,9 @@
             <input type="number" id="coalsPerHookah" min="0" step="1" value="5">
           </label>
         </div>
+        <label>Стафф классик в день
+          <input type="number" id="staffPerDay" min="0" step="1" value="2">
+        </label>
         <label>Дата
           <span class="date-wrap">
             <input type="date" name="date" required>
@@ -276,6 +317,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=27"></script>
+  <script src="app.js?v=28"></script>
 </body>
 </html>
