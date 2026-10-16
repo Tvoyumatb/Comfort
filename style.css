@@ -31,7 +31,7 @@ body[data-venue="shishka"] {
 html, body {
   margin: 0;
   min-height: 100%;
-  background: var(--bg);
+  background: #070707;
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
 }
@@ -47,15 +47,16 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: #000 url("tangiers-logo.png") center 42% / min(92vw, 620px) no-repeat;
-  opacity: 0.42;
+  background:
+    linear-gradient(180deg, rgba(8, 6, 5, 0.62) 0%, rgba(8, 6, 5, 0.78) 100%),
+    url("wallpaper-tangiers.jpg") center / cover no-repeat;
   pointer-events: none;
 }
 
 body[data-venue="shishka"]::before {
-  background-image: none;
-  background-color: #12141a;
-  opacity: 1;
+  background:
+    linear-gradient(180deg, rgba(10, 12, 18, 0.66) 0%, rgba(10, 12, 18, 0.82) 100%),
+    url("wallpaper-tangiers.jpg") center / cover no-repeat;
 }
 
 .topbar {
@@ -144,7 +145,8 @@ h1 {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: linear-gradient(var(--bg), color-mix(in srgb, var(--bg) 92%, transparent));
+  background: linear-gradient(rgba(8, 6, 5, 0.72), rgba(8, 6, 5, 0.35));
+  backdrop-filter: blur(10px);
 }
 
 .tabs-3 {
@@ -246,7 +248,8 @@ main {
 }
 
 .card {
-  background: var(--card);
+  background: color-mix(in srgb, var(--card) 86%, transparent);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
