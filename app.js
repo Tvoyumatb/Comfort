@@ -6,6 +6,13 @@ const VENUES = {
   shishka: "Shishka Premium",
 };
 
+const OPENING_DATE = "2026-10-01";
+const OPENING_STOCK = [
+  { name: "Классик", grams: 32529 },
+  { name: "Премиум", grams: 1343 },
+  { name: "Tangiers", grams: 2177 },
+];
+
 const SALE_GROUPS = [
   { id: "classic", num: "1", title: "Классик", note: "Smoke break" },
   { id: "premium", num: "2", title: "Премиум", note: "Smoke break+" },
@@ -152,10 +159,36 @@ function emptyState(venueId = "tangiers") {
   };
 }
 
+function applyOpeningStock(data, venueId) {
+  if (!data || data.openingV1) return data;
+  if (venueId === "shishka") {
+    data.openingV1 = true;
+    return data;
+  }
+  if (!Array.isArray(data.revisions)) data.revisions = [];
+  data.revisions = data.revisions.filter((row) => {
+    if (row.date === OPENING_DATE) return true;
+    const grams = (row.items || []).reduce((sum, item) => sum + Number(item.grams || 0), 0);
+    return grams > 0 || Number(row.coals) > 0;
+  });
+  let rev = data.revisions.find((row) => row.date === OPENING_DATE);
+  if (!rev) {
+    rev = { date: OPENING_DATE, coals: 0, items: [] };
+    data.revisions.push(rev);
+  }
+  OPENING_STOCK.forEach((open) => {
+    const item = rev.items.find((row) => row.name === open.name);
+    if (item) item.grams = open.grams;
+    else rev.items.unshift({ name: open.name, grams: open.grams });
+  });
+  data.openingV1 = true;
+  return data;
+}
+
 function normalizeVenue(data, venueId) {
   const base = emptyState(venueId);
-  if (!data || typeof data !== "object") return base;
-  return {
+  if (!data || typeof data !== "object") return applyOpeningStock(base);
+  const venue = {
     employees: data.employees?.length ? data.employees : base.employees,
     schedule: data.schedule || {},
     extras: data.extras || {},
@@ -173,7 +206,9 @@ function normalizeVenue(data, venueId) {
           items: data.checklist.items,
         }
       : base.checklist,
+    openingV1: Boolean(data.openingV1),
   };
+  return applyOpeningStock(venue, venueId);
 }
 
 function loadDb() {
@@ -193,15 +228,15 @@ function loadDb() {
       current: "tangiers",
       venues: {
         tangiers: normalizeVenue(old, "tangiers"),
-        shishka: emptyState("shishka"),
+        shishka: normalizeVenue({}, "shishka"),
       },
     };
   } catch {
     return {
       current: "tangiers",
       venues: {
-        tangiers: emptyState("tangiers"),
-        shishka: emptyState("shishka"),
+        tangiers: normalizeVenue({}, "tangiers"),
+        shishka: normalizeVenue({}, "shishka"),
       },
     };
   }
@@ -541,7 +576,7 @@ function setTodayDefaults() {
   document.querySelector('#tobaccoForm [name="date"]').value = today;
   const fineDate = document.querySelector('#fineForm [name="date"]');
   if (fineDate) fineDate.value = today;
-  if (!$("#revisionDate").value) $("#revisionDate").value = today;
+  if (!$("#revisionDate").value) $("#revisionDate").value = OPENING_DATE;
   const saleDate = document.querySelector('#saleForm [name="date"]');
   if (saleDate) saleDate.value = today;
 }
@@ -644,17 +679,25 @@ function formatGrams(n) {
   return Number(n || 0).toLocaleString("ru-RU");
 }
 
+function latestRevision(date) {
+  return (state.revisions || [])
+    .filter((rev) => rev.date <= date)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
 function renderRevision() {
-  const date = $("#revisionDate").value || toISODate(new Date());
+  applyOpeningStock(state, db.current);
+  const date = $("#revisionDate").value || OPENING_DATE;
   $("#revisionDate").value = date;
-  const rev = ensureRevision(date);
+  const rev = state.revisions.find((row) => row.date === date) || latestRevision(date) || ensureRevision(OPENING_DATE);
   $("#coalsInput").value = rev.coals || 0;
   if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
   const gramsInput = $("#gramsPerHookah");
   if (gramsInput && document.activeElement !== gramsInput) {
     gramsInput.value = gramsPerHookah();
   }
-  const remainTotal = SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, date), 0);
+  const snap = rev.date;
+  const remainTotal = SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, snap), 0);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionRemain").textContent = formatGrams(remainTotal);
   $("#revisionRows").innerHTML = rev.items.map((item, index) => `
@@ -665,8 +708,8 @@ function renderRevision() {
   `).join("");
 
   $("#saleButtons").innerHTML = SALE_GROUPS.map((group) => {
-    const remain = remainGroup(rev, group.id, date);
-    const sold = soldHookahsForGroup(group.id, date);
+    const remain = remainGroup(rev, group.id, snap);
+    const sold = soldHookahsForGroup(group.id, snap);
     return `
       <button type="button" class="sale-btn" data-sale-group="${group.id}">
         <strong>${group.num}. ${group.title}</strong>
@@ -678,7 +721,7 @@ function renderRevision() {
   }).join("");
 
   const sales = [...state.hookahSales]
-    .filter((sale) => inRevisionWindow(sale.date, date))
+    .filter((sale) => inRevisionWindow(sale.date, snap))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   if (!sales.length) {
     $("#salesList").innerHTML = `<p class="empty">Жмите 1 Классик, 2 Премиум или 3 Tangiers — с остатка группы спишется само</p>`;
