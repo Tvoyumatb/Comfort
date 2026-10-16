@@ -954,7 +954,7 @@ function renderRevision() {
   $("#revisionRows").innerHTML = rev.items.map((item, index) => {
     const remain = remainGroup(rev, brandGroup(item.name), snap);
     return `
-    <label class="sheet-row">
+    <label class="sheet-row group-${brandGroup(item.name)}">
       <span>${escapeHtml(item.name)} <small>сейчас ${formatGrams(remain)} г</small></span>
       <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
     </label>
@@ -966,7 +966,7 @@ function renderRevision() {
     const remain = remainGroup(rev, group.id, snap);
     const sold = soldHookahsForGroup(group.id, snap);
     return `
-      <button type="button" class="sale-btn" data-sale-group="${group.id}">
+      <button type="button" class="sale-btn group-${group.id}" data-sale-group="${group.id}">
         <strong>${group.num}. ${group.title}</strong>
         <span>${group.note}</span>
         <b class="${remain <= 0 ? "low-stock" : ""}">${formatGrams(remain)} г</b>
@@ -982,7 +982,7 @@ function renderRevision() {
     $("#salesList").innerHTML = `<p class="empty">После подтверждения спишется табак и уголь</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
-      <article class="card item">
+      <article class="card item group-${brandGroup(sale.product)}">
         <div class="item-head">
           <h3>${escapeHtml(groupTitle(brandGroup(sale.product)))} · ${sale.hookahs} кальянов</h3>
           <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
@@ -1083,7 +1083,7 @@ function renderIncomeGroups() {
       .filter((row) => rowGroup(row) === group.id)
       .reduce((sum, row) => sum + Number(row.qty || 0), 0);
     return `
-      <button type="button" class="sale-btn" data-income-group="${group.id}">
+      <button type="button" class="sale-btn group-${group.id}" data-income-group="${group.id}">
         <strong>${group.num}. ${group.title}</strong>
         <span>${group.note}</span>
         <b>${formatGrams(grams)} г</b>
@@ -1107,7 +1107,7 @@ function renderTobacco() {
       const grams = rows
         .filter((row) => rowGroup(row) === group.id)
         .reduce((total, row) => total + Number(row.qty || 0), 0);
-      return `<div class="stat"><span>${group.num}. ${group.title}</span><b>${formatGrams(grams)} г</b></div>`;
+      return `<div class="stat group-${group.id}"><span>${group.num}. ${group.title}</span><b>${formatGrams(grams)} г</b></div>`;
     }).join("") + `
       <div class="stat"><span>Всего</span><b>${formatGrams(qty)} г</b></div>
       <div class="stat"><span>Сумма</span><b>${formatSum(sum)}</b></div>
@@ -1128,8 +1128,11 @@ function renderTobacco() {
       const title = incomingKind === "tobacco"
         ? `${groupTitle(rowGroup(t))}${t.product && t.product !== groupTitle(rowGroup(t)) ? ` · ${t.product}` : ""}`
         : t.product;
+      const tone = incomingKind === "tobacco" ? `group-${rowGroup(t)}`
+        : incomingKind === "coal" ? "group-coal"
+        : "group-inventory";
       return `
-      <article class="card item">
+      <article class="card item ${tone}">
         <div class="item-head">
           <h3>${escapeHtml(title)}</h3>
           <button type="button" class="danger" data-del-tobacco="${t.id}">Удалить</button>

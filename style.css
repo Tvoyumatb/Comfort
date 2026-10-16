@@ -8,6 +8,11 @@
   --accent: #e8a54b;
   --accent-2: #3d8f6a;
   --danger: #c45c4a;
+  --classic: #f0c14b;
+  --premium: #c084fc;
+  --tangiers: #ff6b35;
+  --coal: #c4a574;
+  --inventory: #3dcdc0;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
   --radius: 16px;
   --pad: max(16px, env(safe-area-inset-left));
@@ -145,10 +150,28 @@ h1 {
   font-weight: 700;
 }
 
+.venue[data-venue="tangiers"] {
+  border-color: #ff6b35;
+}
+
+.venue[data-venue="shishka"] {
+  border-color: #7ab8ff;
+}
+
 .venue.is-active {
   background: var(--accent);
   color: #1a1510;
   border-color: transparent;
+}
+
+body[data-venue="tangiers"] .venue[data-venue="tangiers"].is-active {
+  background: #ff6b35;
+  color: #1a100c;
+}
+
+body[data-venue="shishka"] .venue[data-venue="shishka"].is-active {
+  background: #7ab8ff;
+  color: #10141c;
 }
 
 .income-kinds {
@@ -177,11 +200,18 @@ h1 {
   min-height: 44px;
 }
 
+.income-kind[data-income="tobacco"] { border-color: var(--classic); }
+.income-kind[data-income="inventory"] { border-color: var(--inventory); }
+.income-kind[data-income="coal"] { border-color: var(--coal); }
+
 .income-kind.is-active {
-  background: var(--accent);
   color: #1a1510;
   border-color: transparent;
 }
+
+.income-kind[data-income="tobacco"].is-active { background: var(--classic); }
+.income-kind[data-income="inventory"].is-active { background: var(--inventory); color: #102422; }
+.income-kind[data-income="coal"].is-active { background: var(--coal); color: #1a1510; }
 
 .tabs {
   display: grid;
@@ -221,11 +251,21 @@ h1 {
   color: var(--muted);
 }
 
+.tab[data-tab="shifts"] { border: 1px solid #fff200; }
+.tab[data-tab="revision"] { border: 1px solid var(--tangiers); }
+.tab[data-tab="tobacco"] { border: 1px solid var(--inventory); }
+.tab[data-tab="checklist"] { border: 1px solid #7ab8ff; }
+
 .tab.is-active {
-  background: var(--accent);
-  color: #1a1510;
   font-weight: 700;
+  color: #1a1510;
+  border-color: transparent;
 }
+
+.tab[data-tab="shifts"].is-active { background: #fff200; }
+.tab[data-tab="revision"].is-active { background: var(--tangiers); color: #fff; }
+.tab[data-tab="tobacco"].is-active { background: var(--inventory); color: #102422; }
+.tab[data-tab="checklist"].is-active { background: #7ab8ff; }
 
 main {
   padding: 0 var(--pad);
@@ -512,6 +552,70 @@ input[type="number"] {
 
 .sale-btn b {
   font-size: 20px;
+}
+
+.sale-btn.group-classic,
+.sheet-row.group-classic,
+.item.group-classic,
+.stat.group-classic {
+  border-color: var(--classic);
+  background: color-mix(in srgb, #f0c14b 18%, var(--card));
+}
+
+.sale-btn.group-premium,
+.sheet-row.group-premium,
+.item.group-premium,
+.stat.group-premium {
+  border-color: var(--premium);
+  background: color-mix(in srgb, #c084fc 20%, var(--card));
+}
+
+.sale-btn.group-tangiers,
+.sheet-row.group-tangiers,
+.item.group-tangiers,
+.stat.group-tangiers {
+  border-color: var(--tangiers);
+  background: color-mix(in srgb, #ff6b35 22%, var(--card));
+}
+
+.item.group-coal,
+.stat.group-coal {
+  border-color: var(--coal);
+  background: color-mix(in srgb, #c4a574 18%, var(--card));
+}
+
+.item.group-inventory,
+.stat.group-inventory {
+  border-color: var(--inventory);
+  background: color-mix(in srgb, #3dcdc0 16%, var(--card));
+}
+
+.sale-btn.group-classic b,
+.stat.group-classic b { color: #ffe08a; }
+.sale-btn.group-premium b,
+.stat.group-premium b { color: #e9c6ff; }
+.sale-btn.group-tangiers b,
+.stat.group-tangiers b { color: #ffb08a; }
+
+.sheet-row.group-classic,
+.sheet-row.group-premium,
+.sheet-row.group-tangiers {
+  border-left: 5px solid currentColor;
+}
+
+.sheet-row.group-classic { color: var(--classic); }
+.sheet-row.group-premium { color: var(--premium); }
+.sheet-row.group-tangiers { color: var(--tangiers); }
+
+.sheet-row.group-classic span,
+.sheet-row.group-premium span,
+.sheet-row.group-tangiers span {
+  color: var(--text);
+}
+
+.sheet-row.coals {
+  background: color-mix(in srgb, #c4a574 16%, var(--card));
+  border-left: 5px solid var(--coal);
 }
 
 .low-stock {
