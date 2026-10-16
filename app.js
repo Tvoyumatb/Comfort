@@ -24,8 +24,33 @@ const SALE_GROUPS = [
 
 const PREMIUM_BRANDS = [
   "overdose", "spectrum", "deus", "sebero", "starline", "darkside",
-  "musthave", "satyr", "jent", "hooligan", "jent cigar",
-  "blackburn/banger/bliss/chabacco",
+  "musthave", "must have", "satyr", "jent", "hooligan", "хулиган",
+  "jent cigar",
+];
+
+const INVOICE_DATE = "2026-10-10";
+const INVOICE_SEED = [
+  { kind: "tobacco", group: "premium", product: "Spectrum 200g Hard", packs: 1, gramsEach: 200, sum: 210000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Must have 250g", packs: 9, gramsEach: 250, sum: 2295000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Must have 125g", packs: 4, gramsEach: 125, sum: 540000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Palitra 200g", packs: 6, gramsEach: 200, sum: 1200000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Sarma 200g", packs: 12, gramsEach: 200, sum: 2700000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Dark side 250g", packs: 13, gramsEach: 250, sum: 3900000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Overdose 200g", packs: 3, gramsEach: 200, sum: 714000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Северный 200g", packs: 12, gramsEach: 200, sum: 2760000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Deus 250g", packs: 5, gramsEach: 250, sum: 1250000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Bonche 80g", packs: 1, gramsEach: 80, sum: 245000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "SEBERO BLACK 200g", packs: 5, gramsEach: 200, sum: 1100000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Sebero classic 200g", packs: 11, gramsEach: 200, sum: 2255000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Sebero ГИД 200g", packs: 1, gramsEach: 200, sum: 220000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Starline 250g", packs: 7, gramsEach: 250, sum: 1505000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Black Burn 200g", packs: 3, gramsEach: 200, sum: 651000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Jent 200g", packs: 2, gramsEach: 200, sum: 440000, note: "чек 74047" },
+  { kind: "tobacco", group: "classic", product: "Табак Oven 200g", packs: 1, gramsEach: 200, sum: 190000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Хулиган POP/Classic 200g", packs: 2, gramsEach: 200, sum: 380000, note: "чек 74047" },
+  { kind: "tobacco", group: "premium", product: "Darkside Sabotage 250g", packs: 4, gramsEach: 250, sum: 1260000, note: "чек 74047" },
+  { kind: "inventory", product: "Мундштуки одноразовые", qty: 30, sum: 270000, note: "чек 74051" },
+  { kind: "inventory", product: "Ершик для колбы Black", qty: 1, sum: 45000, note: "10.10 ершик" },
 ];
 
 const DEFAULT_BRANDS = [
@@ -206,9 +231,51 @@ function applyOpeningStock(data, venueId) {
   return data;
 }
 
+function applyInvoices(data, venueId) {
+  if (!data || data.invoicesV1) return data;
+  if (venueId === "shishka") {
+    data.invoicesV1 = true;
+    return data;
+  }
+  if (!Array.isArray(data.tobacco)) data.tobacco = [];
+  if (!Array.isArray(data.inventoryStock)) data.inventoryStock = [];
+  INVOICE_SEED.forEach((row, index) => {
+    if (row.kind === "inventory") {
+      const exists = data.inventoryStock.some((item) => item.name.toLowerCase() === row.product.toLowerCase());
+      if (!exists) data.inventoryStock.push({ id: `inv-seed-${index}`, name: row.product, start: 0 });
+      data.tobacco.push({
+        id: `invoice-inv-${index}`,
+        kind: "inventory",
+        date: INVOICE_DATE,
+        product: row.product,
+        supplier: "Rotana Shop UZ1",
+        qty: row.qty,
+        sum: row.sum,
+        note: row.note,
+      });
+      return;
+    }
+    data.tobacco.push({
+      id: `invoice-tob-${index}`,
+      kind: "tobacco",
+      group: row.group,
+      date: INVOICE_DATE,
+      product: row.product,
+      supplier: "Rotana Shop UZ1",
+      qty: row.packs * row.gramsEach,
+      sum: row.sum,
+      note: `${row.note} · ${row.packs} шт × ${row.gramsEach} г`,
+    });
+  });
+  data.invoicesV1 = true;
+  return data;
+}
+
 function normalizeVenue(data, venueId) {
   const base = emptyState(venueId);
-  if (!data || typeof data !== "object") return applyOpeningStock(base);
+  if (!data || typeof data !== "object") {
+    return applyInvoices(applyOpeningStock(applyConsumption(base), venueId), venueId);
+  }
   const venue = {
     employees: data.employees?.length ? data.employees : base.employees,
     schedule: data.schedule || {},
@@ -231,8 +298,9 @@ function normalizeVenue(data, venueId) {
         }
       : base.checklist,
     openingV1: Boolean(data.openingV1),
+    invoicesV1: Boolean(data.invoicesV1),
   };
-  return applyOpeningStock(applyConsumption(venue), venueId);
+  return applyInvoices(applyOpeningStock(applyConsumption(venue), venueId), venueId);
 }
 
 function loadDb() {
@@ -675,18 +743,18 @@ function normalizeName(name) {
 }
 
 function brandGroup(name) {
-  const n = normalizeName(name);
+  const n = normalizeName(name).replace(/\s+/g, " ");
   if (["classic", "premium", "tangiers"].includes(n)) return n;
-  if (/\+|plus|премиум|^premium$/.test(n) || n.includes("smoke break+") || n.includes("break plus")) {
-    return "premium";
-  }
   if (n.includes("tangiers") || n.includes("акция") || n.includes("aroma") || n === "tng") {
     return "tangiers";
+  }
+  if (PREMIUM_BRANDS.some((brand) => n.includes(brand))) return "premium";
+  if (/\+|plus|премиум|^premium$/.test(n) || n.includes("smoke break+") || n.includes("break plus")) {
+    return "premium";
   }
   if (n.includes("classic") || n.includes("классик") || n.includes("smoke break") || n.includes("smokebrush") || n.includes("smoke brush")) {
     return "classic";
   }
-  if (PREMIUM_BRANDS.some((brand) => n.includes(brand))) return "premium";
   return "classic";
 }
 
