@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
   <header class="topbar no-print">
@@ -132,13 +132,10 @@
             <input type="date" name="date" required>
           </span>
         </label>
-        <label>Марка
-          <select name="product" id="saleBrandSelect" required></select>
+        <label>Сколько кальянов за нажатие
+          <input type="number" name="hookahs" min="1" step="1" value="1" required>
         </label>
-        <label>Сколько кальянов
-          <input type="number" name="hookahs" min="1" step="1" required>
-        </label>
-        <button type="submit" class="primary">Списать с остатка</button>
+        <div class="sale-btns" id="saleButtons"></div>
       </form>
       <div class="list" id="salesList"></div>
     </section>
@@ -219,6 +216,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

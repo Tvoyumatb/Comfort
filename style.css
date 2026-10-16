@@ -425,21 +425,40 @@ input[type="number"] {
   font-size: 18px;
 }
 
-.rev-line .sheet-row {
-  border-bottom: 0;
+.sale-btns {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
 }
 
-.rev-line .remain {
-  margin: 0;
-  padding: 0 14px 10px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-  border-bottom: 1px solid var(--line);
-}
-
-.rev-line .remain b {
+.sale-btn {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 88px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 80%, transparent);
   color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sale-btn strong {
+  font-size: 18px;
+}
+
+.sale-btn span,
+.sale-btn em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 13px;
+}
+
+.sale-btn b {
+  font-size: 20px;
 }
 
 .sheet-row.coals {

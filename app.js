@@ -6,6 +6,18 @@ const VENUES = {
   shishka: "Shishka Premium",
 };
 
+const SALE_GROUPS = [
+  { id: "classic", num: "1", title: "Классик", note: "Smoke break" },
+  { id: "premium", num: "2", title: "Премиум", note: "Smoke break+" },
+  { id: "tangiers", num: "3", title: "Tangiers", note: "Tangiers-акция" },
+];
+
+const PREMIUM_BRANDS = [
+  "overdose", "spectrum", "deus", "sebero", "starline", "darkside",
+  "musthave", "satyr", "jent", "hooligan", "jent cigar",
+  "blackburn/banger/bliss/chabacco",
+];
+
 const DEFAULT_BRANDS = [
   "Blackburn/banger/bliss/chabacco",
   "Overdose",
@@ -558,6 +570,30 @@ function gramsPerHookah() {
   return Math.max(1, Number(state.gramsPerHookah) || 20);
 }
 
+function normalizeName(name) {
+  return String(name || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function brandGroup(name) {
+  const n = normalizeName(name);
+  if (["classic", "premium", "tangiers"].includes(n)) return n;
+  if (/\+|plus|премиум|^premium$/.test(n) || n.includes("smoke break+") || n.includes("break plus")) {
+    return "premium";
+  }
+  if (n.includes("tangiers") || n.includes("акция") || n.includes("aroma") || n === "tng") {
+    return "tangiers";
+  }
+  if (n.includes("classic") || n.includes("классик") || n.includes("smoke break") || n.includes("smokebrush") || n.includes("smoke brush")) {
+    return "classic";
+  }
+  if (PREMIUM_BRANDS.some((brand) => n.includes(brand))) return "premium";
+  return "classic";
+}
+
+function groupTitle(id) {
+  return SALE_GROUPS.find((group) => group.id === id)?.title || id;
+}
+
 function nextRevisionDate(fromDate) {
   return (state.revisions || [])
     .map((rev) => rev.date)
@@ -569,30 +605,39 @@ function inRevisionWindow(iso, fromDate) {
   return iso >= fromDate && iso < nextRevisionDate(fromDate);
 }
 
-function salesForBrand(name, fromDate) {
-  return (state.hookahSales || [])
-    .filter((sale) => sale.product.toLowerCase() === name.toLowerCase() && inRevisionWindow(sale.date, fromDate));
+function salesForGroup(groupId, fromDate) {
+  return (state.hookahSales || []).filter((sale) =>
+    brandGroup(sale.product) === groupId && inRevisionWindow(sale.date, fromDate)
+  );
 }
 
-function soldGramsFor(name, fromDate) {
-  return salesForBrand(name, fromDate).reduce((sum, sale) => sum + Number(sale.hookahs || 0) * gramsPerHookah(), 0);
+function soldGramsForGroup(groupId, fromDate) {
+  return salesForGroup(groupId, fromDate).reduce((sum, sale) => sum + Number(sale.hookahs || 0) * gramsPerHookah(), 0);
 }
 
-function soldHookahsFor(name, fromDate) {
-  return salesForBrand(name, fromDate).reduce((sum, sale) => sum + Number(sale.hookahs || 0), 0);
+function soldHookahsForGroup(groupId, fromDate) {
+  return salesForGroup(groupId, fromDate).reduce((sum, sale) => sum + Number(sale.hookahs || 0), 0);
 }
 
-function incomeGramsAfter(name, fromDate) {
+function incomeGramsForGroup(groupId, fromDate) {
   return (state.tobacco || [])
     .filter((row) => (row.kind || "tobacco") === "tobacco"
-      && row.product.toLowerCase() === name.toLowerCase()
+      && brandGroup(row.product) === groupId
       && row.date > fromDate
       && row.date < nextRevisionDate(fromDate))
     .reduce((sum, row) => sum + Number(row.qty || 0), 0);
 }
 
-function remainGrams(item, fromDate) {
-  return Number(item.grams || 0) + incomeGramsAfter(item.name, fromDate) - soldGramsFor(item.name, fromDate);
+function snapshotGramsForGroup(rev, groupId) {
+  return rev.items
+    .filter((item) => brandGroup(item.name) === groupId)
+    .reduce((sum, item) => sum + Number(item.grams || 0), 0);
+}
+
+function remainGroup(rev, groupId, fromDate) {
+  return snapshotGramsForGroup(rev, groupId)
+    + incomeGramsForGroup(groupId, fromDate)
+    - soldGramsForGroup(groupId, fromDate);
 }
 
 function formatGrams(n) {
@@ -609,50 +654,39 @@ function renderRevision() {
   if (gramsInput && document.activeElement !== gramsInput) {
     gramsInput.value = gramsPerHookah();
   }
-  const remainTotal = rev.items.reduce((sum, item) => sum + remainGrams(item, date), 0);
+  const remainTotal = SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, date), 0);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionRemain").textContent = formatGrams(remainTotal);
-  $("#revisionRows").innerHTML = rev.items.map((item, index) => {
-    const soldG = soldGramsFor(item.name, date);
-    const soldN = soldHookahsFor(item.name, date);
-    const income = incomeGramsAfter(item.name, date);
-    const remain = remainGrams(item, date);
+  $("#revisionRows").innerHTML = rev.items.map((item, index) => `
+    <label class="sheet-row">
+      <span>${escapeHtml(item.name)}</span>
+      <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
+    </label>
+  `).join("");
+
+  $("#saleButtons").innerHTML = SALE_GROUPS.map((group) => {
+    const remain = remainGroup(rev, group.id, date);
+    const sold = soldHookahsForGroup(group.id, date);
     return `
-      <div class="rev-line">
-        <label class="sheet-row">
-          <span>${escapeHtml(item.name)}</span>
-          <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
-        </label>
-        <p class="remain ${remain <= 0 ? "low-stock" : ""}">
-          ${soldN ? `Продано ${soldN} кальянов (−${formatGrams(soldG)} г)` : "Продаж пока нет"}
-          ${income ? ` · приход +${formatGrams(income)} г` : ""}
-          · остаток <b>${formatGrams(remain)}</b> г
-        </p>
-      </div>
+      <button type="button" class="sale-btn" data-sale-group="${group.id}">
+        <strong>${group.num}. ${group.title}</strong>
+        <span>${group.note}</span>
+        <b class="${remain <= 0 ? "low-stock" : ""}">${formatGrams(remain)} г</b>
+        <em>продано ${sold} кальянов</em>
+      </button>
     `;
   }).join("");
-
-  const brandSelect = $("#saleBrandSelect");
-  if (brandSelect) {
-    const current = brandSelect.value;
-    brandSelect.innerHTML = rev.items
-      .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
-      .join("");
-    if (current && [...brandSelect.options].some((opt) => opt.value === current)) {
-      brandSelect.value = current;
-    }
-  }
 
   const sales = [...state.hookahSales]
     .filter((sale) => inRevisionWindow(sale.date, date))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   if (!sales.length) {
-    $("#salesList").innerHTML = `<p class="empty">Скидывайте сюда ежедневные продажи — граммы спишутся сами</p>`;
+    $("#salesList").innerHTML = `<p class="empty">Жмите 1 Классик, 2 Премиум или 3 Tangiers — с остатка группы спишется само</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
       <article class="card item">
         <div class="item-head">
-          <h3>${escapeHtml(sale.product)} · ${sale.hookahs} кальянов</h3>
+          <h3>${escapeHtml(groupTitle(brandGroup(sale.product)))} · ${sale.hookahs} кальянов</h3>
           <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
         </div>
         <p class="meta">
@@ -956,10 +990,9 @@ $("#revisionRows").addEventListener("input", (e) => {
   save();
   const date = $("#revisionDate").value;
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  $("#revisionRemain").textContent = formatGrams(rev.items.reduce((sum, item) => sum + remainGrams(item, date), 0));
-  const line = e.target.closest(".rev-line")?.querySelector(".remain b");
-  const item = rev.items[Number(index)];
-  if (line && item) line.textContent = formatGrams(remainGrams(item, date));
+  $("#revisionRemain").textContent = formatGrams(
+    SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, date), 0)
+  );
 });
 
 $("#coalsInput").addEventListener("input", (e) => {
@@ -981,29 +1014,28 @@ $("#addBrandForm").addEventListener("submit", (e) => {
   e.target.reset();
 });
 
+$("#saleForm").addEventListener("submit", (e) => e.preventDefault());
+
 $("#gramsPerHookah").addEventListener("input", (e) => {
   state.gramsPerHookah = Math.max(1, Number(e.target.value || 20));
   save();
   renderRevision();
 });
 
-$("#saleForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target));
+$("#saleButtons").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-sale-group]");
+  if (!btn) return;
+  const hookahs = Number(document.querySelector('#saleForm [name="hookahs"]')?.value || 1);
+  const date = document.querySelector('#saleForm [name="date"]')?.value || toISODate(new Date());
   if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
   state.hookahSales.push({
     id: uid(),
-    date: data.date,
-    product: data.product,
-    hookahs: Number(data.hookahs || 0),
+    date,
+    product: btn.dataset.saleGroup,
+    hookahs: Math.max(1, hookahs),
   });
   save();
-  const product = data.product;
-  e.target.reset();
-  setTodayDefaults();
   renderRevision();
-  const select = $("#saleBrandSelect");
-  if (select && product) select.value = product;
 });
 
 function setIncomingKind(kind) {
