@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=11">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header class="topbar no-print">
@@ -150,8 +150,11 @@
             <input type="date" name="date" required>
           </span>
         </label>
-        <label><span id="productLabelText">Марка</span>
-          <input type="text" name="product" list="productsList" placeholder="Например Starline" required>
+        <label id="stockProductWrap" hidden>Позиция из остатков
+          <select name="stockProduct" id="stockProductSelect"></select>
+        </label>
+        <label id="freeProductWrap"><span id="productLabelText">Марка</span>
+          <input type="text" name="product" list="productsList" placeholder="Например Starline">
         </label>
         <datalist id="productsList"></datalist>
         <label>Поставщик
@@ -192,6 +195,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>

@@ -73,7 +73,7 @@ const INCOME = {
   },
   inventory: {
     title: "Приход инвентаря",
-    hint: "Чаши, щипцы, шланги и другое",
+    hint: "Приход привязан к остаткам: изначально + дозакупка − порча",
     name: "Наименование",
     placeholder: "Колба, чаша, шланг",
     qty: "Количество, шт",
@@ -584,6 +584,28 @@ function syncIncomeForm() {
   });
   const kindSelect = $("#incomeKindSelect");
   if (kindSelect) kindSelect.value = incomingKind;
+  const stockWrap = $("#stockProductWrap");
+  const freeWrap = $("#freeProductWrap");
+  const stockSelect = $("#stockProductSelect");
+  const productInput = document.querySelector('#tobaccoForm [name="product"]');
+  const isInventory = incomingKind === "inventory";
+  if (stockWrap) stockWrap.hidden = !isInventory;
+  if (freeWrap) freeWrap.hidden = isInventory;
+  if (productInput) productInput.required = !isInventory;
+  if (stockSelect) {
+    stockSelect.required = isInventory;
+    const stock = ensureInventory();
+    const current = stockSelect.value;
+    stockSelect.innerHTML = stock
+      .map((item) => {
+        const now = Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
+        return `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)} · сейчас ${now} шт</option>`;
+      })
+      .join("");
+    if (current && [...stockSelect.options].some((opt) => opt.value === current)) {
+      stockSelect.value = current;
+    }
+  }
 }
 
 function renderTobacco() {
@@ -656,13 +678,16 @@ function renderInventoryStock() {
             const fines = fineQtyFor(item.name);
             const now = Number(item.start || 0) + income - fines;
             return `
-              <tr>
+              <tr class="${now <= 2 ? "low-stock" : ""}">
                 <th class="name">${escapeHtml(item.name)}</th>
                 <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" data-stock-start="${item.id}"></td>
                 <td>${income}</td>
                 <td>${fines}</td>
                 <td class="sum">${now}</td>
-                <td><button type="button" class="danger" data-del-stock="${item.id}">Удалить</button></td>
+                <td>
+                  <button type="button" class="ghost restock" data-restock="${escapeHtml(item.name)}">Дозакупить</button>
+                  <button type="button" class="danger" data-del-stock="${item.id}">Удалить</button>
+                </td>
               </tr>
             `;
           }).join("")}
@@ -673,7 +698,7 @@ function renderInventoryStock() {
       <input type="text" name="name" placeholder="Добавить позицию, например колба" required>
       <button type="submit" class="primary compact">+</button>
     </form>
-    <p class="hint">Изначально — сколько было на точке. Приход и порча (колба, чаша) считаются сами.</p>
+    <p class="hint">Изначально ставите один раз. Дальше только приход / дозакупка и порча: сейчас = изначально + приход − порча.</p>
   `;
 }
 
@@ -871,8 +896,11 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const kind = data.kind || incomingKind;
-  const product = data.product.trim();
-  if (kind === "inventory") ensureStockItem(product);
+  let product = (data.stockProduct || data.product || "").trim();
+  if (kind === "inventory") {
+    if (!product) return;
+    product = ensureStockItem(product).name;
+  }
   state.tobacco.push({
     id: uid(),
     kind,
@@ -885,6 +913,7 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   });
   save();
   e.target.reset();
+  incomingKind = kind;
   setTodayDefaults();
   renderTobacco();
 });
@@ -902,6 +931,16 @@ document.addEventListener("click", (e) => {
     save();
     renderShifts();
     if (incomingKind === "inventory") renderInventoryStock();
+  }
+  const restock = e.target.dataset.restock;
+  if (restock) {
+    incomingKind = "inventory";
+    renderTobacco();
+    const select = $("#stockProductSelect");
+    if (select) select.value = restock;
+    const qty = document.querySelector('#tobaccoForm [name="qty"]');
+    if (qty) qty.focus();
+    $("#tobaccoForm").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   const stockId = e.target.dataset.delStock;
   if (stockId) {

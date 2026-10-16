@@ -655,6 +655,17 @@ input[type="number"] {
   min-width: 64px;
 }
 
+.stock-table .restock {
+  width: auto;
+  min-height: 36px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.stock-table .low-stock .sum {
+  color: #c45c4a;
+}
+
 .a4-page {
   background: #2a2a2a;
   padding: 8px;
