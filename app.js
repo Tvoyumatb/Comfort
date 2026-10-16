@@ -10,11 +10,6 @@ const DEFAULT_GRAMS_PER_HOOKAH = 25;
 const DEFAULT_COALS_PER_HOOKAH = 5;
 const DEFAULT_COALS_PER_PACK = 72;
 const OPENING_DATE = "2026-10-01";
-const OPENING_STOCK = [
-  { name: "Классик", grams: 32529 },
-  { name: "Премиум", grams: 1343 },
-  { name: "Tangiers", grams: 2177 },
-];
 
 const SALE_GROUPS = [
   { id: "classic", num: "1", title: "Классик", note: "Smoke break" },
@@ -29,31 +24,6 @@ const PREMIUM_BRANDS = [
   "troffimoff",
   "trofimoff",
   "troffimofs",
-];
-
-const INVOICE_DATE = "2026-10-10";
-const INVOICE_SEED = [
-  { kind: "tobacco", group: "classic", product: "Spectrum 200g Hard", packs: 1, gramsEach: 200, sum: 210000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Must have 250g", packs: 9, gramsEach: 250, sum: 2295000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Must have 125g", packs: 4, gramsEach: 125, sum: 540000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Palitra 200g", packs: 6, gramsEach: 200, sum: 1200000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Sarma 200g", packs: 12, gramsEach: 200, sum: 2700000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Dark side 250g", packs: 13, gramsEach: 250, sum: 3900000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Overdose 200g", packs: 3, gramsEach: 200, sum: 714000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Северный 200g", packs: 12, gramsEach: 200, sum: 2760000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Deus 250g", packs: 5, gramsEach: 250, sum: 1250000, note: "чек 74047" },
-  { kind: "tobacco", group: "premium", product: "Bonche 80g", packs: 1, gramsEach: 80, sum: 245000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "SEBERO BLACK 200g", packs: 5, gramsEach: 200, sum: 1100000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Sebero classic 200g", packs: 11, gramsEach: 200, sum: 2255000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Sebero ГИД 200g", packs: 1, gramsEach: 200, sum: 220000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Starline 250g", packs: 7, gramsEach: 250, sum: 1505000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Black Burn 200g", packs: 3, gramsEach: 200, sum: 651000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Jent 200g", packs: 2, gramsEach: 200, sum: 440000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Табак Oven 200g", packs: 1, gramsEach: 200, sum: 190000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Хулиган POP/Classic 200g", packs: 2, gramsEach: 200, sum: 380000, note: "чек 74047" },
-  { kind: "tobacco", group: "classic", product: "Darkside Sabotage 250g", packs: 4, gramsEach: 250, sum: 1260000, note: "чек 74047" },
-  { kind: "inventory", product: "Мундштуки одноразовые", qty: 30, sum: 270000, note: "чек 74051 · 30 пачек" },
-  { kind: "inventory", product: "Ершик для колбы Black", qty: 1, sum: 45000, note: "10.10 ершик" },
 ];
 
 const DEFAULT_BRANDS = [
@@ -215,104 +185,35 @@ function applyConsumption(data) {
   return data;
 }
 
-function applyOpeningStock(data, venueId) {
-  if (!data) return data;
-  if (data.openingV1 && (venueId !== "shishka" || data.shishkaOpenV2)) return data;
-  if (!Array.isArray(data.revisions)) data.revisions = [];
-  data.revisions = data.revisions.filter((row) => {
-    if (row.date === OPENING_DATE) return true;
-    const grams = (row.items || []).reduce((sum, item) => sum + Number(item.grams || 0), 0);
-    return grams > 0 || Number(row.coals) > 0;
-  });
-  let rev = data.revisions.find((row) => row.date === OPENING_DATE);
-  if (!rev) {
-    rev = { date: OPENING_DATE, coals: 0, items: [] };
-    data.revisions.push(rev);
-  }
-  const stock = venueId === "shishka"
-    ? [
-        { name: "Классик", grams: 0 },
-        { name: "Премиум", grams: 0 },
-      ]
-    : OPENING_STOCK;
-  stock.forEach((open) => {
-    const item = rev.items.find((row) => row.name === open.name);
-    if (item) item.grams = open.grams;
-    else rev.items.unshift({ name: open.name, grams: open.grams });
-  });
-  data.openingV1 = true;
-  if (venueId === "shishka") data.shishkaOpenV2 = true;
-  return data;
+function emptyOpening(venueId) {
+  return {
+    date: OPENING_DATE,
+    coals: 0,
+    items: SALE_GROUPS
+      .filter((group) => venueId !== "shishka" || group.id !== "tangiers")
+      .map((group) => ({ name: group.title, grams: 0 })),
+  };
 }
 
-function applyInvoices(data, venueId) {
-  if (!data || data.invoicesV2) return data;
-  if (venueId === "shishka") {
-    data.invoicesV2 = true;
-    return data;
-  }
-  if (!Array.isArray(data.tobacco)) data.tobacco = [];
-  if (!Array.isArray(data.inventoryStock)) data.inventoryStock = [];
-  data.tobacco = data.tobacco.filter((row) => !String(row.id || "").startsWith("invoice-"));
-  INVOICE_SEED.forEach((row, index) => {
-    if (row.kind === "inventory") {
-      const exists = data.inventoryStock.some((item) => item.name.toLowerCase() === row.product.toLowerCase());
-      if (!exists) data.inventoryStock.push({ id: `inv-seed-${index}`, name: row.product, start: 0 });
-      data.tobacco.push({
-        id: `invoice-inv-${index}`,
-        kind: "inventory",
-        date: INVOICE_DATE,
-        product: row.product,
-        supplier: "Rotana Shop UZ1",
-        qty: row.qty,
-        sum: row.sum,
-        note: row.note,
-      });
-      return;
-    }
-    data.tobacco.push({
-      id: `invoice-tob-${index}`,
-      kind: "tobacco",
-      group: row.group,
-      date: INVOICE_DATE,
-      product: row.product,
-      supplier: "Rotana Shop UZ1",
-      qty: row.packs * row.gramsEach,
-      sum: row.sum,
-      note: `${row.note} · ${row.packs} шт × ${row.gramsEach} г`,
-    });
-  });
+function resetStock(data, venueId) {
+  if (!data || data.freshStockV1) return data;
+  data.tobacco = [];
+  data.hookahSales = [];
+  data.revisions = [emptyOpening(venueId)];
+  data.inventoryStock = defaultInventory();
+  data.openingV1 = true;
+  data.shishkaOpenV2 = true;
   data.invoicesV1 = true;
   data.invoicesV2 = true;
-  return data;
-}
-
-function collapseRevisionGroups(data, venueId) {
-  if (!data || data.revisionGroupsV1) return data;
-  const groups = SALE_GROUPS.filter((group) => venueId !== "shishka" || group.id !== "tangiers");
-  const opening = (data.revisions || []).find((row) => row.date === OPENING_DATE);
-  if (opening) {
-    const summed = { classic: 0, premium: 0, tangiers: 0 };
-    (opening.items || []).forEach((item) => {
-      const groupId = brandGroup(item.name);
-      summed[groupId] = (summed[groupId] || 0) + Number(item.grams || 0);
-    });
-    opening.items = groups.map((group) => ({
-      name: group.title,
-      grams: summed[group.id] || 0,
-    }));
-  }
   data.revisionGroupsV1 = true;
+  data.freshStockV1 = true;
   return data;
 }
 
 function normalizeVenue(data, venueId) {
   const base = emptyState(venueId);
   if (!data || typeof data !== "object") {
-    return collapseRevisionGroups(
-      applyInvoices(applyOpeningStock(applyConsumption(base), venueId), venueId),
-      venueId
-    );
+    return resetStock(applyConsumption(base), venueId);
   }
   const venue = {
     employees: data.employees?.length ? data.employees : base.employees,
@@ -340,14 +241,9 @@ function normalizeVenue(data, venueId) {
     invoicesV1: Boolean(data.invoicesV1),
     invoicesV2: Boolean(data.invoicesV2),
     revisionGroupsV1: Boolean(data.revisionGroupsV1),
+    freshStockV1: Boolean(data.freshStockV1),
   };
-  if (!venue.inventoryStock.some((item) => isMouthpiece(item.name))) {
-    venue.inventoryStock.push({ id: uid(), name: "Мундштуки одноразовые", start: 0 });
-  }
-  return collapseRevisionGroups(
-    applyInvoices(applyOpeningStock(applyConsumption(venue), venueId), venueId),
-    venueId
-  );
+  return resetStock(applyConsumption(venue), venueId);
 }
 
 function loadDb() {
@@ -919,7 +815,7 @@ function latestRevision(date) {
 }
 
 function renderRevision() {
-  applyOpeningStock(state, db.current);
+  resetStock(state, db.current);
   pruneEmptyRevisions();
   const date = $("#revisionDate").value || OPENING_DATE;
   const exact = (state.revisions || []).find((row) => row.date === date && !isEmptyRevision(row));
@@ -1767,3 +1663,4 @@ if ("serviceWorker" in navigator) {
 syncVenueUi();
 setTodayDefaults();
 render();
+save();
