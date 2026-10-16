@@ -574,7 +574,7 @@ function periodDays() {
 
 function isWeekend(date) {
   const day = date.getDay();
-  return day === 0 || day === 6;
+  return day === 0 || day === 5 || day === 6;
 }
 
 function shiftClass(type, date) {
