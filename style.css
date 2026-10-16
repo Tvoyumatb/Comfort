@@ -425,6 +425,23 @@ input[type="number"] {
   font-size: 18px;
 }
 
+.rev-line .sheet-row {
+  border-bottom: 0;
+}
+
+.rev-line .remain {
+  margin: 0;
+  padding: 0 14px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  border-bottom: 1px solid var(--line);
+}
+
+.rev-line .remain b {
+  color: var(--text);
+}
+
 .sheet-row.coals {
   margin: 0;
   color: var(--text);

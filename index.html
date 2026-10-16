@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
   <header class="topbar no-print">
@@ -108,15 +108,39 @@
           <button type="submit" class="primary compact">+</button>
         </form>
         <div class="sheet-row total">
-          <span>Общее кол-во</span>
+          <span>На снятии</span>
           <strong id="revisionTotal">0</strong>
+        </div>
+        <div class="sheet-row total">
+          <span>Сейчас с учётом продаж</span>
+          <strong id="revisionRemain">0</strong>
         </div>
         <label class="sheet-row coals">
           <span>Угли</span>
           <input type="number" id="coalsInput" min="0" step="1" inputmode="numeric">
         </label>
       </div>
-      <p class="hint">Ревизия сохраняется сама. Можно вести отдельный лист на каждую дату снятия.</p>
+      <p class="hint">Ревизия — сколько было на снятии. Ежедневные продажи кальянов сами вычитаются из остатка.</p>
+
+      <form class="card form" id="saleForm">
+        <h2>Продажи кальянов за день</h2>
+        <label>Грамм на 1 кальян
+          <input type="number" id="gramsPerHookah" min="1" step="1" value="20">
+        </label>
+        <label>Дата
+          <span class="date-wrap">
+            <input type="date" name="date" required>
+          </span>
+        </label>
+        <label>Марка
+          <select name="product" id="saleBrandSelect" required></select>
+        </label>
+        <label>Сколько кальянов
+          <input type="number" name="hookahs" min="1" step="1" required>
+        </label>
+        <button type="submit" class="primary">Списать с остатка</button>
+      </form>
+      <div class="list" id="salesList"></div>
     </section>
 
     <section id="tobacco" class="panel" role="tabpanel" hidden>
@@ -195,6 +219,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

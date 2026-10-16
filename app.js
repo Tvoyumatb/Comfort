@@ -135,6 +135,8 @@ function emptyState(venueId = "tangiers") {
     checklist: defaultChecklist(venueId),
     inventoryStock: defaultInventory(),
     fines: [],
+    hookahSales: [],
+    gramsPerHookah: 20,
   };
 }
 
@@ -150,6 +152,8 @@ function normalizeVenue(data, venueId) {
     revisions: data.revisions || [],
     inventoryStock: data.inventoryStock?.length ? data.inventoryStock : base.inventoryStock,
     fines: data.fines || [],
+    hookahSales: data.hookahSales || [],
+    gramsPerHookah: Number(data.gramsPerHookah) || 20,
     checklist: data.checklist?.items
       ? {
           tableNo: data.checklist.tableNo || "20",
@@ -526,6 +530,8 @@ function setTodayDefaults() {
   const fineDate = document.querySelector('#fineForm [name="date"]');
   if (fineDate) fineDate.value = today;
   if (!$("#revisionDate").value) $("#revisionDate").value = today;
+  const saleDate = document.querySelector('#saleForm [name="date"]');
+  if (saleDate) saleDate.value = today;
 }
 
 function ensureRevision(date) {
@@ -548,6 +554,47 @@ function revisionTotal(rev) {
   return rev.items.reduce((sum, item) => sum + Number(item.grams || 0), 0);
 }
 
+function gramsPerHookah() {
+  return Math.max(1, Number(state.gramsPerHookah) || 20);
+}
+
+function nextRevisionDate(fromDate) {
+  return (state.revisions || [])
+    .map((rev) => rev.date)
+    .filter((date) => date > fromDate)
+    .sort()[0] || "9999-12-31";
+}
+
+function inRevisionWindow(iso, fromDate) {
+  return iso >= fromDate && iso < nextRevisionDate(fromDate);
+}
+
+function salesForBrand(name, fromDate) {
+  return (state.hookahSales || [])
+    .filter((sale) => sale.product.toLowerCase() === name.toLowerCase() && inRevisionWindow(sale.date, fromDate));
+}
+
+function soldGramsFor(name, fromDate) {
+  return salesForBrand(name, fromDate).reduce((sum, sale) => sum + Number(sale.hookahs || 0) * gramsPerHookah(), 0);
+}
+
+function soldHookahsFor(name, fromDate) {
+  return salesForBrand(name, fromDate).reduce((sum, sale) => sum + Number(sale.hookahs || 0), 0);
+}
+
+function incomeGramsAfter(name, fromDate) {
+  return (state.tobacco || [])
+    .filter((row) => (row.kind || "tobacco") === "tobacco"
+      && row.product.toLowerCase() === name.toLowerCase()
+      && row.date > fromDate
+      && row.date < nextRevisionDate(fromDate))
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
+function remainGrams(item, fromDate) {
+  return Number(item.grams || 0) + incomeGramsAfter(item.name, fromDate) - soldGramsFor(item.name, fromDate);
+}
+
 function formatGrams(n) {
   return Number(n || 0).toLocaleString("ru-RU");
 }
@@ -557,13 +604,64 @@ function renderRevision() {
   $("#revisionDate").value = date;
   const rev = ensureRevision(date);
   $("#coalsInput").value = rev.coals || 0;
+  if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
+  const gramsInput = $("#gramsPerHookah");
+  if (gramsInput && document.activeElement !== gramsInput) {
+    gramsInput.value = gramsPerHookah();
+  }
+  const remainTotal = rev.items.reduce((sum, item) => sum + remainGrams(item, date), 0);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  $("#revisionRows").innerHTML = rev.items.map((item, index) => `
-    <label class="sheet-row">
-      <span>${escapeHtml(item.name)}</span>
-      <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
-    </label>
-  `).join("");
+  $("#revisionRemain").textContent = formatGrams(remainTotal);
+  $("#revisionRows").innerHTML = rev.items.map((item, index) => {
+    const soldG = soldGramsFor(item.name, date);
+    const soldN = soldHookahsFor(item.name, date);
+    const income = incomeGramsAfter(item.name, date);
+    const remain = remainGrams(item, date);
+    return `
+      <div class="rev-line">
+        <label class="sheet-row">
+          <span>${escapeHtml(item.name)}</span>
+          <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
+        </label>
+        <p class="remain ${remain <= 0 ? "low-stock" : ""}">
+          ${soldN ? `Продано ${soldN} кальянов (−${formatGrams(soldG)} г)` : "Продаж пока нет"}
+          ${income ? ` · приход +${formatGrams(income)} г` : ""}
+          · остаток <b>${formatGrams(remain)}</b> г
+        </p>
+      </div>
+    `;
+  }).join("");
+
+  const brandSelect = $("#saleBrandSelect");
+  if (brandSelect) {
+    const current = brandSelect.value;
+    brandSelect.innerHTML = rev.items
+      .map((item) => `<option value="${escapeHtml(item.name)}">${escapeHtml(item.name)}</option>`)
+      .join("");
+    if (current && [...brandSelect.options].some((opt) => opt.value === current)) {
+      brandSelect.value = current;
+    }
+  }
+
+  const sales = [...state.hookahSales]
+    .filter((sale) => inRevisionWindow(sale.date, date))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  if (!sales.length) {
+    $("#salesList").innerHTML = `<p class="empty">Скидывайте сюда ежедневные продажи — граммы спишутся сами</p>`;
+  } else {
+    $("#salesList").innerHTML = sales.map((sale) => `
+      <article class="card item">
+        <div class="item-head">
+          <h3>${escapeHtml(sale.product)} · ${sale.hookahs} кальянов</h3>
+          <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
+        </div>
+        <p class="meta">
+          ${parseISODate(sale.date).toLocaleDateString("ru-RU")}
+          · −${formatGrams(Number(sale.hookahs) * gramsPerHookah())} г
+        </p>
+      </article>
+    `).join("");
+  }
 }
 
 function incomingRows() {
@@ -856,7 +954,12 @@ $("#revisionRows").addEventListener("input", (e) => {
   const rev = ensureRevision($("#revisionDate").value);
   rev.items[Number(index)].grams = Number(e.target.value || 0);
   save();
+  const date = $("#revisionDate").value;
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
+  $("#revisionRemain").textContent = formatGrams(rev.items.reduce((sum, item) => sum + remainGrams(item, date), 0));
+  const line = e.target.closest(".rev-line")?.querySelector(".remain b");
+  const item = rev.items[Number(index)];
+  if (line && item) line.textContent = formatGrams(remainGrams(item, date));
 });
 
 $("#coalsInput").addEventListener("input", (e) => {
@@ -876,6 +979,31 @@ $("#addBrandForm").addEventListener("submit", (e) => {
     renderRevision();
   }
   e.target.reset();
+});
+
+$("#gramsPerHookah").addEventListener("input", (e) => {
+  state.gramsPerHookah = Math.max(1, Number(e.target.value || 20));
+  save();
+  renderRevision();
+});
+
+$("#saleForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
+  state.hookahSales.push({
+    id: uid(),
+    date: data.date,
+    product: data.product,
+    hookahs: Number(data.hookahs || 0),
+  });
+  save();
+  const product = data.product;
+  e.target.reset();
+  setTodayDefaults();
+  renderRevision();
+  const select = $("#saleBrandSelect");
+  if (select && product) select.value = product;
 });
 
 function setIncomingKind(kind) {
@@ -919,6 +1047,12 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
 });
 
 document.addEventListener("click", (e) => {
+  const saleId = e.target.dataset.delSale;
+  if (saleId) {
+    state.hookahSales = (state.hookahSales || []).filter((sale) => sale.id !== saleId);
+    save();
+    renderRevision();
+  }
   const tobaccoId = e.target.dataset.delTobacco;
   if (tobaccoId) {
     state.tobacco = state.tobacco.filter((t) => t.id !== tobaccoId);
