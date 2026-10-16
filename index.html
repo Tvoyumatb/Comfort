@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=15">
+  <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
   <header class="topbar no-print">
@@ -116,17 +116,26 @@
           <strong id="revisionRemain">0</strong>
         </div>
         <label class="sheet-row coals">
-          <span>Угли</span>
+          <span>Угли на снятии</span>
           <input type="number" id="coalsInput" min="0" step="1" inputmode="numeric">
         </label>
+        <div class="sheet-row total">
+          <span>Сейчас углей</span>
+          <strong id="coalsRemain">0 шт</strong>
+        </div>
       </div>
-      <p class="hint">Ревизия — сколько было на снятии. Ежедневные продажи кальянов сами вычитаются из остатка.</p>
+      <p class="hint">Ревизия — сколько было на снятии. Каждый кальян списывает 25 г табака и 5 шт угля.</p>
 
       <form class="card form" id="saleForm">
         <h2>Продажи кальянов за день</h2>
-        <label>Грамм на 1 кальян
-          <input type="number" id="gramsPerHookah" min="1" step="1" value="20">
-        </label>
+        <div class="row">
+          <label>Грамм на 1 кальян
+            <input type="number" id="gramsPerHookah" min="1" step="1" value="25">
+          </label>
+          <label>Угля на 1 кальян, шт
+            <input type="number" id="coalsPerHookah" min="0" step="1" value="5">
+          </label>
+        </div>
         <label>Дата
           <span class="date-wrap">
             <input type="date" name="date" required>
@@ -216,6 +225,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

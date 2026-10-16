@@ -461,6 +461,10 @@ input[type="number"] {
   font-size: 20px;
 }
 
+.low-stock {
+  color: #ff8a7a;
+}
+
 .sheet-row.coals {
   margin: 0;
   color: var(--text);

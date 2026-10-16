@@ -6,6 +6,8 @@ const VENUES = {
   shishka: "Shishka Premium",
 };
 
+const DEFAULT_GRAMS_PER_HOOKAH = 25;
+const DEFAULT_COALS_PER_HOOKAH = 5;
 const OPENING_DATE = "2026-10-01";
 const OPENING_STOCK = [
   { name: "Классик", grams: 32529 },
@@ -102,12 +104,12 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Коробки или килограммы",
+    hint: "Приход в штуках. С каждого кальяна списывается 5 шт",
     name: "Наименование",
     placeholder: "Кокосовый уголь",
-    qty: "Количество",
+    qty: "Количество, шт",
     unit: "шт",
-    qtyStat: "Кол-во",
+    qtyStat: "Штук",
     empty: "Прихода угля пока нет",
   },
 };
@@ -155,8 +157,23 @@ function emptyState(venueId = "tangiers") {
     inventoryStock: defaultInventory(),
     fines: [],
     hookahSales: [],
-    gramsPerHookah: 20,
+    gramsPerHookah: DEFAULT_GRAMS_PER_HOOKAH,
+    coalsPerHookah: DEFAULT_COALS_PER_HOOKAH,
+    consumptionV1: true,
   };
+}
+
+function applyConsumption(data) {
+  if (!data) return data;
+  if (!data.consumptionV1) {
+    data.gramsPerHookah = DEFAULT_GRAMS_PER_HOOKAH;
+    data.coalsPerHookah = DEFAULT_COALS_PER_HOOKAH;
+    data.consumptionV1 = true;
+  } else {
+    data.gramsPerHookah = Math.max(1, Number(data.gramsPerHookah) || DEFAULT_GRAMS_PER_HOOKAH);
+    data.coalsPerHookah = Math.max(0, Number(data.coalsPerHookah) || DEFAULT_COALS_PER_HOOKAH);
+  }
+  return data;
 }
 
 function applyOpeningStock(data, venueId) {
@@ -198,7 +215,9 @@ function normalizeVenue(data, venueId) {
     inventoryStock: data.inventoryStock?.length ? data.inventoryStock : base.inventoryStock,
     fines: data.fines || [],
     hookahSales: data.hookahSales || [],
-    gramsPerHookah: Number(data.gramsPerHookah) || 20,
+    gramsPerHookah: Number(data.gramsPerHookah) || DEFAULT_GRAMS_PER_HOOKAH,
+    coalsPerHookah: Number(data.coalsPerHookah) || DEFAULT_COALS_PER_HOOKAH,
+    consumptionV1: Boolean(data.consumptionV1),
     checklist: data.checklist?.items
       ? {
           tableNo: data.checklist.tableNo || "20",
@@ -208,7 +227,7 @@ function normalizeVenue(data, venueId) {
       : base.checklist,
     openingV1: Boolean(data.openingV1),
   };
-  return applyOpeningStock(venue, venueId);
+  return applyOpeningStock(applyConsumption(venue), venueId);
 }
 
 function loadDb() {
@@ -602,7 +621,11 @@ function revisionTotal(rev) {
 }
 
 function gramsPerHookah() {
-  return Math.max(1, Number(state.gramsPerHookah) || 20);
+  return Math.max(1, Number(state.gramsPerHookah) || DEFAULT_GRAMS_PER_HOOKAH);
+}
+
+function coalsPerHookah() {
+  return Math.max(0, Number(state.coalsPerHookah) || DEFAULT_COALS_PER_HOOKAH);
 }
 
 function normalizeName(name) {
@@ -675,6 +698,26 @@ function remainGroup(rev, groupId, fromDate) {
     - soldGramsForGroup(groupId, fromDate);
 }
 
+function soldHookahsTotal(fromDate) {
+  return (state.hookahSales || [])
+    .filter((sale) => inRevisionWindow(sale.date, fromDate))
+    .reduce((sum, sale) => sum + Number(sale.hookahs || 0), 0);
+}
+
+function incomeCoals(fromDate) {
+  return (state.tobacco || [])
+    .filter((row) => row.kind === "coal"
+      && row.date > fromDate
+      && row.date < nextRevisionDate(fromDate))
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
+function remainCoals(rev, fromDate) {
+  return Number(rev.coals || 0)
+    + incomeCoals(fromDate)
+    - soldHookahsTotal(fromDate) * coalsPerHookah();
+}
+
 function formatGrams(n) {
   return Number(n || 0).toLocaleString("ru-RU");
 }
@@ -696,10 +739,20 @@ function renderRevision() {
   if (gramsInput && document.activeElement !== gramsInput) {
     gramsInput.value = gramsPerHookah();
   }
+  const coalsUseInput = $("#coalsPerHookah");
+  if (coalsUseInput && document.activeElement !== coalsUseInput) {
+    coalsUseInput.value = coalsPerHookah();
+  }
   const snap = rev.date;
   const remainTotal = SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, snap), 0);
+  const coalsNow = remainCoals(rev, snap);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionRemain").textContent = formatGrams(remainTotal);
+  const coalsRemain = $("#coalsRemain");
+  if (coalsRemain) {
+    coalsRemain.textContent = `${formatGrams(coalsNow)} шт`;
+    coalsRemain.classList.toggle("low-stock", coalsNow <= 0);
+  }
   $("#revisionRows").innerHTML = rev.items.map((item, index) => `
     <label class="sheet-row">
       <span>${escapeHtml(item.name)}</span>
@@ -735,6 +788,7 @@ function renderRevision() {
         <p class="meta">
           ${parseISODate(sale.date).toLocaleDateString("ru-RU")}
           · −${formatGrams(Number(sale.hookahs) * gramsPerHookah())} г
+          · −${formatGrams(Number(sale.hookahs) * coalsPerHookah())} шт угля
         </p>
       </article>
     `).join("");
@@ -1042,6 +1096,12 @@ $("#coalsInput").addEventListener("input", (e) => {
   const rev = ensureRevision($("#revisionDate").value);
   rev.coals = Number(e.target.value || 0);
   save();
+  const remainEl = $("#coalsRemain");
+  if (remainEl) {
+    const now = remainCoals(rev, rev.date);
+    remainEl.textContent = `${formatGrams(now)} шт`;
+    remainEl.classList.toggle("low-stock", now <= 0);
+  }
 });
 
 $("#addBrandForm").addEventListener("submit", (e) => {
@@ -1060,7 +1120,13 @@ $("#addBrandForm").addEventListener("submit", (e) => {
 $("#saleForm").addEventListener("submit", (e) => e.preventDefault());
 
 $("#gramsPerHookah").addEventListener("input", (e) => {
-  state.gramsPerHookah = Math.max(1, Number(e.target.value || 20));
+  state.gramsPerHookah = Math.max(1, Number(e.target.value || DEFAULT_GRAMS_PER_HOOKAH));
+  save();
+  renderRevision();
+});
+
+$("#coalsPerHookah").addEventListener("input", (e) => {
+  state.coalsPerHookah = Math.max(0, Number(e.target.value || DEFAULT_COALS_PER_HOOKAH));
   save();
   renderRevision();
 });
