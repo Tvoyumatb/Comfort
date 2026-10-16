@@ -9,7 +9,7 @@ const VENUES = {
 const DEFAULT_GRAMS_PER_HOOKAH = 25;
 const DEFAULT_COALS_PER_HOOKAH = 5;
 const DEFAULT_COALS_PER_PACK = 72;
-const OPENING_DATE = "2026-10-01";
+const OPENING_DATE = "2026-08-28";
 
 const SALE_GROUPS = [
   { id: "classic", num: "1", title: "Классик", note: "Smoke break" },
@@ -200,6 +200,23 @@ function emptyOpening(venueId) {
   };
 }
 
+function shiftOpeningDate(data, venueId) {
+  if (!data || data.startFromAug28V1) return data;
+  const oldOpen = "2026-10-01";
+  if (!Array.isArray(data.revisions) || !data.revisions.length) {
+    data.revisions = [emptyOpening(venueId)];
+  } else {
+    data.revisions = data.revisions.map((rev) => (
+      rev.date === oldOpen ? { ...rev, date: OPENING_DATE } : rev
+    ));
+    if (!data.revisions.some((rev) => rev.date === OPENING_DATE)) {
+      data.revisions.unshift(emptyOpening(venueId));
+    }
+  }
+  data.startFromAug28V1 = true;
+  return data;
+}
+
 function resetStock(data, venueId) {
   if (!data || data.freshStockV1) return data;
   data.tobacco = [];
@@ -249,8 +266,9 @@ function normalizeVenue(data, venueId) {
     invoicesV2: Boolean(data.invoicesV2),
     revisionGroupsV1: Boolean(data.revisionGroupsV1),
     freshStockV1: Boolean(data.freshStockV1),
+    startFromAug28V1: Boolean(data.startFromAug28V1),
   };
-  return resetStock(applyConsumption(venue), venueId);
+  return shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId);
 }
 
 function loadDb() {
