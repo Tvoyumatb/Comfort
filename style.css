@@ -885,11 +885,13 @@ input[type="number"] {
 .ticket {
   background: #fff;
   color: #111;
-  border-radius: 2px;
+  border: 0;
+  border-radius: 0;
   padding: 6px 7px 8px;
   min-height: 92px;
   font-size: 11px;
-  line-height: 1.2;
+  line-height: 1.15;
+  overflow: hidden;
 }
 
 .ticket-head {
@@ -921,6 +923,9 @@ input[type="number"] {
 
 .ticket p {
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
 }
 
 @media (min-width: 760px) {
@@ -965,9 +970,17 @@ input[type="number"] {
     color: #111;
   }
 
+  .ticket,
+  body.print-checklist .ticket,
+  body.print-checklist .card {
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff;
+  }
+
   @page {
     size: A4 portrait;
-    margin: 6mm;
+    margin: 5mm;
   }
 
   body.print-checklist {
@@ -993,8 +1006,8 @@ input[type="number"] {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-auto-rows: 1fr;
-    gap: 2.4mm;
-    height: 285mm;
+    gap: 1.6mm 2mm;
+    height: 287mm;
     margin: 0;
     padding: 0;
     background: #fff;
@@ -1003,8 +1016,15 @@ input[type="number"] {
   body.print-checklist .ticket {
     min-height: 0;
     height: 100%;
-    border: 1px solid #111;
-    font-size: 8.2pt;
-    padding: 2mm 2.2mm;
+    border: 0 !important;
+    outline: 0;
+    font-size: 7pt;
+    line-height: 1.12;
+    padding: 1.1mm 1.2mm;
+    overflow: hidden;
+  }
+
+  body.print-checklist .ticket-head {
+    margin-bottom: 2px;
   }
 }
