@@ -901,7 +901,6 @@ function renderReport() {
         <td>${formatSum(extra.fines || 0)}</td>
         <td>${formatSum(extra.advances || 0)}</td>
         <td>${formatSum(damageTotal(emp.id))}</td>
-        <td class="sum">${formatSum(payout(emp.id))}</td>
       </tr>
     `;
   }).join("");
@@ -915,7 +914,6 @@ function renderReport() {
   const lateTotal = lateFines.reduce((sum, row) => sum + row.sum, 0);
   const damageSum = damages.reduce((sum, f) => sum + Number(f.sum || 0), 0);
   const advanceTotal = state.employees.reduce((sum, emp) => sum + Number(extrasFor(emp.id).advances || 0), 0);
-  const payTotal = state.employees.reduce((sum, emp) => sum + payout(emp.id), 0);
 
   const lateTable = lateFines.length
     ? `<table class="pay report-table">
@@ -987,7 +985,6 @@ function renderReport() {
               <th>Штрафы</th>
               <th>Авансы</th>
               <th>Порча</th>
-              <th>К выплате</th>
             </tr>
           </thead>
           <tbody>
@@ -998,7 +995,6 @@ function renderReport() {
               <td class="sum">${formatSum(lateTotal)}</td>
               <td class="sum">${formatSum(advanceTotal)}</td>
               <td class="sum">${formatSum(damageSum)}</td>
-              <td class="sum">${formatSum(payTotal)}</td>
             </tr>
           </tbody>
         </table>
