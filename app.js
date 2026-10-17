@@ -917,7 +917,7 @@ function renderReport() {
   const advanceTotal = state.employees.reduce((sum, emp) => sum + Number(extrasFor(emp.id).advances || 0), 0);
 
   const lateTable = lateFines.length
-    ? `<section>
+    ? `<section class="report-fines">
         <h2>Штрафы</h2>
         <table class="pay report-table">
           <thead><tr><th class="name">Сотрудник</th><th>Штраф</th></tr></thead>
@@ -930,7 +930,7 @@ function renderReport() {
     : "";
 
   const damageTable = damages.length
-    ? `<section>
+    ? `<section class="report-damage">
         <h2>Порча</h2>
         <table class="pay report-table">
           <thead>

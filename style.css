@@ -1036,6 +1036,49 @@ input[type="number"] {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.report-fines h2,
+.report-pay th:nth-child(6),
+.report-pay td:nth-child(6) {
+  background: #f4c4bc;
+  color: #7a2418;
+}
+
+.report-fines table,
+.report-fines th,
+.report-fines td {
+  background: #fdecea;
+  border-color: #d98b80;
+}
+
+.report-fines .name {
+  background: #fdecea;
+}
+
+.report-damage h2,
+.report-pay th:nth-child(8),
+.report-pay td:nth-child(8) {
+  background: #b7e4dc;
+  color: #0f5c52;
+}
+
+.report-damage table,
+.report-damage th,
+.report-damage td {
+  background: #e8f7f3;
+  border-color: #6fbfb2;
+}
+
+.report-damage .name {
+  background: #e8f7f3;
+}
+
+.report-fines h2,
+.report-damage h2 {
+  padding: 4px 8px;
 }
 
 .report-split table {
