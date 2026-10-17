@@ -979,8 +979,8 @@ function renderReport() {
           <tr>
             <th class="name">Сотрудник</th>
             <th>Утро</th>
-            <th>Будни</th>
-            <th>Пт–вс</th>
+            <th>Будни вечер</th>
+            <th>Выходной вечер</th>
             <th>Стаж</th>
             <th>Штрафы</th>
             <th>Авансы</th>
