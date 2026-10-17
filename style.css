@@ -928,20 +928,21 @@ input[type="number"] {
 .ticket-line {
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 0;
   white-space: nowrap;
 }
 
 .ticket-line > span:first-child {
   min-width: 0;
   overflow: hidden;
+  flex: 0 1 auto;
 }
 
 .tick {
   flex: 0 0 1.15em;
   width: 1.15em;
   height: 0.9em;
-  margin-left: auto;
+  margin: 0;
   border-bottom: 1.2px solid #000;
 }
 
