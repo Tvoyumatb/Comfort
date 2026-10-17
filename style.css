@@ -893,25 +893,18 @@ input[type="number"] {
 }
 
 .report-bar {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #f4f4f4;
-  border-bottom: 1px solid #ccc;
-  color: #222;
-}
-
-.report-bar p {
-  margin: 0;
-  font-size: 14px;
+  position: fixed;
+  top: 6px;
+  right: 8px;
+  z-index: 3;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 
 .report-bar .ghost {
+  padding: 4px 10px;
+  font-size: 12px;
   color: #111;
   border: 1px solid #777;
   background: #fff;
@@ -920,48 +913,62 @@ input[type="number"] {
 .report-paper {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 20px 16px 40px;
+  padding: 8px 10px 12px;
   background: #fff;
   color: #111;
 }
 
 .report-head h1 {
-  margin: 0 0 8px;
+  margin: 0;
   color: #111;
-  font-size: 26px;
-}
-
-.report-kicker {
-  margin: 0 0 4px;
-  color: #555;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
 }
 
 .report-rates {
-  margin: 0 0 16px;
+  margin: 2px 0 6px;
   color: #333;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .report-paper h2 {
-  margin: 18px 0 8px;
+  margin: 0 0 3px;
   color: #111;
-  font-size: 18px;
+  font-size: 12px;
 }
 
-.report-paper .excel-card,
-.report-paper .roster-wrap,
-.report-paper .pay-wrap {
+.report-paper .excel-card {
   overflow: visible;
+  margin-bottom: 6px;
+  border-radius: 4px;
 }
 
 .report-paper .roster,
 .report-paper .pay {
   table-layout: fixed;
   width: 100%;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.report-paper .roster th,
+.report-paper .roster td,
+.report-paper .pay th,
+.report-paper .pay td {
+  padding: 1px 3px;
+  height: auto;
+  line-height: 1.15;
+}
+
+.report-paper .roster th {
+  min-width: 0;
+  height: 20px;
+  font-size: 10px;
+}
+
+.report-paper .pay th {
+  padding: 3px 4px;
+  font-size: 10px;
   min-width: 0;
 }
 
@@ -970,26 +977,30 @@ input[type="number"] {
   position: static;
   min-width: 0;
   max-width: none;
-  width: 16%;
+  width: 15%;
+  padding: 1px 5px;
+  font-size: 11px;
+  line-height: 1.15;
 }
 
 .report-paper .cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
-  font-size: 11px;
+  min-height: 18px;
+  font-size: 10px;
   cursor: default;
 }
 
-.report-empty {
-  margin: 0 0 12px;
-  color: #444;
+.report-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
 }
 
 .report-table {
   width: 100%;
-  margin-bottom: 8px;
+  margin: 0;
 }
 
 body.report-open {
