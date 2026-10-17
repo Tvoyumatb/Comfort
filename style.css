@@ -1015,7 +1015,8 @@ input[type="number"] {
   justify-content: center;
   min-height: 100%;
   height: 100%;
-  font-size: 13px;
+  font-size: 11px;
+  white-space: nowrap;
   cursor: default;
 }
 

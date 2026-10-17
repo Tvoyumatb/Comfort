@@ -883,8 +883,7 @@ function renderReport() {
       ${days.map((date) => {
         const type = state.schedule[toISODate(date)]?.[emp.id] || "";
         const cls = shiftClass(type, date);
-        const mark = type === "morning" ? "У" : type === "intern" ? "С" : type ? "В" : "/";
-        return `<td><span class="cell ${cls}">${mark}</span></td>`;
+        return `<td><span class="cell ${cls}">${SHIFT_LABEL[type]}</span></td>`;
       }).join("")}
     </tr>
   `).join("");
