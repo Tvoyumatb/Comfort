@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=38">
+  <link rel="stylesheet" href="style.css?v=39">
 </head>
 <body>
   <header class="topbar no-print">
@@ -132,13 +132,13 @@
         <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Добавь название угля и штуки, либо пачки во вкладке Приход → Уголь.</p>
         <button type="button" class="ghost" id="snapshotBtn">Зафиксировать снятие на выбранную дату</button>
       </div>
-      <p class="hint">Позиция 25 г / 5 углей, фрукт 40 г / 7 углей. Табак любой. Недосдачу в конце месяца списывай с общего как шеф или фрукт.</p>
+      <p class="hint">Позиция 25 г / 5 углей. Фрукт 40 г / 7 углей с классика, премиума или Tangiers. Недосдачу списывай с той группы, где нехватка — как шеф или фрукт.</p>
 
       <div class="card sheet" id="staffBox"></div>
 
       <form class="card form" id="monthSaleForm">
         <h2>Ушло за месяц</h2>
-        <p class="hint">Обычная позиция 25 г и 5 углей. На фрукте 40 г и 7 углей — с общего. Недосдачу по любой группе спиши как шеф или фрукт.</p>
+        <p class="hint">Обычная позиция 25 г и 5 углей. Фрукт 40 г и 7 углей — с классика, премиума или Tangiers. Недосдачу спиши с той группы, где нехватка.</p>
         <label>Месяц
           <input type="month" name="month" required>
         </label>
@@ -153,8 +153,16 @@
         <label id="monthTangiersWrap">Tangiers, кальянов
           <input type="number" name="tangiers" min="0" step="1" value="0">
         </label>
-        <label>На фрукте, кальянов
-          <input type="number" name="fruit" min="0" step="1" value="0">
+        <div class="row">
+          <label>Фрукт классик
+            <input type="number" name="fruitClassic" min="0" step="1" value="0">
+          </label>
+          <label>Фрукт премиум
+            <input type="number" name="fruitPremium" min="0" step="1" value="0">
+          </label>
+        </div>
+        <label id="monthFruitTangiersWrap">Фрукт Tangiers
+          <input type="number" name="fruitTangiers" min="0" step="1" value="0">
         </label>
         <div class="row">
           <label>Недосдача, г
@@ -169,7 +177,7 @@
         </div>
         <label>Недосдача с какой группы
           <select name="shortGroup">
-            <option value="classic">Классик (общий)</option>
+            <option value="classic">Классик</option>
             <option value="premium">Премиум</option>
             <option value="tangiers">Tangiers</option>
           </select>
@@ -341,6 +349,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=38"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>

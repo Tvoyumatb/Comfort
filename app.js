@@ -1205,6 +1205,8 @@ function renderRevision() {
   }
   const tangiersMonth = $("#monthTangiersWrap");
   if (tangiersMonth) tangiersMonth.hidden = db.current === "shishka";
+  const fruitTangiers = $("#monthFruitTangiersWrap");
+  if (fruitTangiers) fruitTangiers.hidden = db.current === "shishka";
   const shortTangiers = document.querySelector('#monthSaleForm [name="shortGroup"] option[value="tangiers"]');
   if (shortTangiers) shortTangiers.hidden = db.current === "shishka";
   const packInput = document.querySelector('#coalForm [name="perPack"]');
@@ -1245,14 +1247,17 @@ function renderRevision() {
         <em>списано ${sold} кальянов</em>
       </button>
     `;
-  }).join("") + `
-      <button type="button" class="sale-btn group-fruit" data-sale-fruit="classic">
-        <strong>На фрукте</strong>
-        <span>${FRUIT_GRAMS} г с общего + ${FRUIT_COALS} угля</span>
-        <b>${formatGrams(remainGroup(rev, "classic", snap))} г классик</b>
-        <em>любой табак, списание с общего</em>
+  }).join("") + saleGroups.map((group) => {
+    const remain = remainGroup(rev, group.id, snap);
+    return `
+      <button type="button" class="sale-btn group-${group.id} group-fruit" data-sale-fruit="${group.id}">
+        <strong>Фрукт · ${group.title}</strong>
+        <span>${FRUIT_GRAMS} г / ${FRUIT_COALS} угля с ${group.title}</span>
+        <b class="${remain <= 0 ? "low-stock" : ""}">${formatGrams(remain)} г</b>
+        <em>на фрукте</em>
       </button>
     `;
+  }).join("");
 
   const staffDays = daysOpenInWindow(snap);
   const staffHookahs = staffHookahsInWindow(snap);
@@ -1275,7 +1280,7 @@ function renderRevision() {
     $("#salesList").innerHTML = `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — спишется с общего.</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
-      <article class="card item ${sale.kind === "fruit" ? "group-fruit" : `group-${brandGroup(sale.product)}`}">
+      <article class="card item group-${brandGroup(sale.product)}${sale.kind === "fruit" ? " group-fruit" : ""}">
         <div class="item-head">
           <h3>${escapeHtml(saleKindLabel(sale.kind))} · ${escapeHtml(groupTitle(brandGroup(sale.product)))} · ${formatGrams(saleGrams(sale))} г</h3>
           <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
@@ -1830,7 +1835,7 @@ function openSaleConfirm(groupId, hookahs, date, kind = "sale") {
   const modal = $("#confirmModal");
   const text = $("#confirmText");
   if (text) {
-    text.textContent = `Списать ${saleKindLabel(kind).toLowerCase()} ${hookahs} × ${kind === "fruit" ? "фрукт" : groupTitle(groupId)}? −${gramsForKind(kind, hookahs)} г и −${coalsForKind(kind, hookahs)} шт угля`;
+    text.textContent = `Списать ${saleKindLabel(kind).toLowerCase()} ${hookahs} × ${groupTitle(groupId)}? −${gramsForKind(kind, hookahs)} г и −${coalsForKind(kind, hookahs)} шт угля`;
   }
   if (modal) modal.hidden = false;
 }
@@ -1914,17 +1919,25 @@ $("#monthSaleForm")?.addEventListener("submit", (e) => {
       };
     })
     .filter((row) => row.hookahs > 0);
-  const fruit = Math.max(0, Number(data.fruit || 0));
-  if (fruit) {
-    rows.push({
-      groupId: "classic",
-      hookahs: fruit,
-      grams: gramsForKind("fruit", fruit),
-      coals: coalsForKind("fruit", fruit),
-      kind: "fruit",
-      date,
+  const fruitByGroup = {
+    classic: Math.max(0, Number(data.fruitClassic || 0)),
+    premium: Math.max(0, Number(data.fruitPremium || 0)),
+    tangiers: Math.max(0, Number(data.fruitTangiers || 0)),
+  };
+  SALE_GROUPS
+    .filter((group) => db.current !== "shishka" || group.id !== "tangiers")
+    .forEach((group) => {
+      const fruit = fruitByGroup[group.id] || 0;
+      if (!fruit) return;
+      rows.push({
+        groupId: group.id,
+        hookahs: fruit,
+        grams: gramsForKind("fruit", fruit),
+        coals: coalsForKind("fruit", fruit),
+        kind: "fruit",
+        date,
+      });
     });
-  }
   const shortGrams = Math.max(0, Number(data.shortage || 0));
   const shortGroup = SALE_GROUPS.some((group) => group.id === data.shortGroup)
     ? data.shortGroup
