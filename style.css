@@ -923,9 +923,26 @@ input[type="number"] {
 
 .ticket p {
   margin: 0;
+}
+
+.ticket-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
   white-space: nowrap;
+}
+
+.ticket-line > span:first-child {
+  min-width: 0;
   overflow: hidden;
-  text-overflow: clip;
+}
+
+.tick {
+  flex: 0 0 1.15em;
+  width: 1.15em;
+  height: 0.9em;
+  margin-left: auto;
+  border-bottom: 1.2px solid #000;
 }
 
 @media (min-width: 760px) {
@@ -1030,5 +1047,12 @@ input[type="number"] {
 
   body.print-checklist .ticket p {
     padding: 0;
+  }
+
+  body.print-checklist .tick {
+    flex-basis: 3.2mm;
+    width: 3.2mm;
+    height: 2.4mm;
+    border-bottom: 1.1pt solid #000;
   }
 }

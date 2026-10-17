@@ -1548,7 +1548,7 @@ function renderChecklistTickets() {
         <span class="ticket-num">${i + 1}.</span>
         <span class="ticket-table">Стол <span class="blank"></span></span>
       </div>
-      ${list.items.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+      ${list.items.map((item) => `<p class="ticket-line"><span>${escapeHtml(item)}</span><span class="tick"></span></p>`).join("")}
     </article>
   `).join("");
 }
