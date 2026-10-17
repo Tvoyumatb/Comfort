@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=39">
+  <link rel="stylesheet" href="style.css?v=40">
 </head>
 <body>
   <header class="topbar no-print">
@@ -120,6 +120,10 @@
           <span>Сейчас с учётом продаж</span>
           <strong id="revisionRemain">0</strong>
         </div>
+        <div class="sheet-row total shortage-row" hidden>
+          <span>Недосдача</span>
+          <strong id="shortageTotal">0</strong>
+        </div>
         <div id="coalKindRows"></div>
         <label class="sheet-row coals" id="coalsInputRow">
           <span>Угли на снятии</span>
@@ -227,6 +231,7 @@
         </label>
         <div class="sale-btns" id="saleButtons"></div>
       </form>
+      <div class="list" id="shortageList"></div>
       <div class="list" id="salesList"></div>
     </section>
 
@@ -349,6 +354,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=39"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>

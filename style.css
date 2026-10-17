@@ -601,6 +601,17 @@ input[type="number"] {
   background: color-mix(in srgb, #7dcea0 18%, var(--card));
 }
 
+.item.group-shortage,
+.sheet-row.shortage-row {
+  border-color: #e07a7a;
+  background: color-mix(in srgb, #e07a7a 16%, var(--card));
+}
+
+.list-heading {
+  margin: 8px 0 4px;
+  font-size: 16px;
+}
+
 .item.group-coal,
 .stat.group-coal {
   border-color: var(--coal);

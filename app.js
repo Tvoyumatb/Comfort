@@ -945,7 +945,8 @@ function staffHookahsInWindow(fromDate) {
 }
 
 function saleKindLabel(kind) {
-  if (kind === "chef") return "Шеф / недосдача";
+  if (kind === "chef") return "Шеф";
+  if (kind === "shortage") return "Недосдача";
   if (kind === "fruit") return "На фрукте";
   if (kind === "month") return "Ушло за месяц";
   if (kind === "staff") return "Стафф";
@@ -1098,6 +1099,33 @@ function soldHookahsTotal(fromDate) {
   return recorded + staffHookahsInWindow(fromDate);
 }
 
+function shortageGramsInWindow(fromDate) {
+  return (state.hookahSales || [])
+    .filter((sale) => sale.kind === "shortage" && inRevisionWindow(sale.date, fromDate))
+    .reduce((sum, sale) => sum + saleGrams(sale), 0);
+}
+
+function saleCard(sale) {
+  const extra = sale.kind === "shortage"
+    ? ` · как ${sale.shortAs === "fruit" ? "фрукт" : "шеф"}`
+    : "";
+  const fruitClass = sale.kind === "fruit" ? " group-fruit" : "";
+  const shortClass = sale.kind === "shortage" ? " group-shortage" : "";
+  return `
+    <article class="card item group-${brandGroup(sale.product)}${fruitClass}${shortClass}">
+      <div class="item-head">
+        <h3>${escapeHtml(saleKindLabel(sale.kind))} · ${escapeHtml(groupTitle(brandGroup(sale.product)))} · ${formatGrams(saleGrams(sale))} г</h3>
+        <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
+      </div>
+      <p class="meta">
+        ${parseISODate(sale.date).toLocaleDateString("ru-RU")}
+        · −${formatGrams(saleGrams(sale))} г
+        · −${formatGrams(saleCoals(sale))} шт угля${extra}
+      </p>
+    </article>
+  `;
+}
+
 function incomeCoals(fromDate) {
   return (state.tobacco || [])
     .filter((row) => row.kind === "coal"
@@ -1218,6 +1246,13 @@ function renderRevision() {
   const coalsNow = remainCoals(rev, snap);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionRemain").textContent = formatGrams(remainTotal);
+  const shortageEl = $("#shortageTotal");
+  if (shortageEl) {
+    const shortGrams = shortageGramsInWindow(snap);
+    shortageEl.textContent = formatGrams(shortGrams);
+    const shortageRow = shortageEl.closest(".sheet-row");
+    if (shortageRow) shortageRow.hidden = shortGrams <= 0;
+  }
   const coalsRemain = $("#coalsRemain");
   if (coalsRemain) {
     coalsRemain.textContent = `${formatGrams(coalsNow)} шт`;
@@ -1276,22 +1311,21 @@ function renderRevision() {
   const sales = [...state.hookahSales]
     .filter((sale) => inRevisionWindow(sale.date, snap))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-  if (!sales.length) {
-    $("#salesList").innerHTML = `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — с классика, премиума или Tangiers.</p>`;
+  const shortages = sales.filter((sale) => sale.kind === "shortage");
+  const rest = sales.filter((sale) => sale.kind !== "shortage");
+  const shortageList = $("#shortageList");
+  if (shortageList) {
+    shortageList.innerHTML = shortages.length
+      ? `<h2 class="list-heading">Недосдача</h2>${shortages.map(saleCard).join("")}`
+      : "";
+  }
+  if (!rest.length) {
+    $("#salesList").innerHTML = shortages.length
+      ? ""
+      : `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — с классика, премиума или Tangiers.</p>`;
   } else {
-    $("#salesList").innerHTML = sales.map((sale) => `
-      <article class="card item group-${brandGroup(sale.product)}${sale.kind === "fruit" ? " group-fruit" : ""}">
-        <div class="item-head">
-          <h3>${escapeHtml(saleKindLabel(sale.kind))} · ${escapeHtml(groupTitle(brandGroup(sale.product)))} · ${formatGrams(saleGrams(sale))} г</h3>
-          <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
-        </div>
-        <p class="meta">
-          ${parseISODate(sale.date).toLocaleDateString("ru-RU")}
-          · −${formatGrams(saleGrams(sale))} г
-          · −${formatGrams(saleCoals(sale))} шт угля
-        </p>
-      </article>
-    `).join("");
+    $("#salesList").innerHTML = (shortages.length ? `<h2 class="list-heading">Ушло за месяц</h2>` : "")
+      + rest.map(saleCard).join("");
   }
 }
 
@@ -1824,6 +1858,7 @@ function recordSale(groupId, hookahs, date, kind = "sale", extra = {}) {
     ...(grams != null ? { grams } : {}),
     ...(coals != null ? { coals } : {}),
     ...(extra.batch ? { batch: true } : {}),
+    ...(extra.shortAs ? { shortAs: extra.shortAs } : {}),
   });
   save();
   renderRevision();
@@ -1870,6 +1905,7 @@ $("#confirmOk")?.addEventListener("click", () => {
       grams: row.grams,
       coals: row.coals,
       batch: true,
+      ...(row.shortAs ? { shortAs: row.shortAs } : {}),
     }));
   } else {
     const kind = pendingSale.kind || "sale";
@@ -1952,7 +1988,8 @@ $("#monthSaleForm")?.addEventListener("submit", (e) => {
       hookahs: shortHookahs,
       grams: shortGrams,
       coals: shortKind === "fruit" ? shortHookahs * FRUIT_COALS : 0,
-      kind: shortKind,
+      kind: "shortage",
+      shortAs: shortKind,
       date,
     });
   }
