@@ -347,6 +347,23 @@ main {
   overflow: hidden;
 }
 
+.extra-sales {
+  cursor: pointer;
+}
+
+.extra-sales summary {
+  font-weight: 700;
+  list-style: none;
+}
+
+.extra-sales summary::-webkit-details-marker {
+  display: none;
+}
+
+.extra-sales[open] summary {
+  margin-bottom: 12px;
+}
+
 select {
   width: 100%;
   max-width: 100%;
