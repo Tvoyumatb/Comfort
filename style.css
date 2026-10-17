@@ -885,9 +885,9 @@ input[type="number"] {
 .ticket {
   background: #fff;
   color: #111;
-  border: 0;
+  border: 1.5px solid #000;
   border-radius: 0;
-  padding: 6px 7px 8px;
+  padding: 7px 8px 8px;
   min-height: 92px;
   font-size: 11px;
   line-height: 1.15;
@@ -970,8 +970,6 @@ input[type="number"] {
     color: #111;
   }
 
-  .ticket,
-  body.print-checklist .ticket,
   body.print-checklist .card {
     border: 0 !important;
     box-shadow: none !important;
@@ -1006,7 +1004,7 @@ input[type="number"] {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-auto-rows: 1fr;
-    gap: 1.6mm 2mm;
+    gap: 2mm;
     height: 287mm;
     margin: 0;
     padding: 0;
@@ -1016,15 +1014,20 @@ input[type="number"] {
   body.print-checklist .ticket {
     min-height: 0;
     height: 100%;
-    border: 0 !important;
+    border: 1.6pt solid #000 !important;
     outline: 0;
-    font-size: 7pt;
-    line-height: 1.12;
-    padding: 1.1mm 1.2mm;
+    box-shadow: none !important;
+    font-size: 6.6pt;
+    line-height: 1.1;
+    padding: 2.2mm 2.4mm 2mm;
     overflow: hidden;
   }
 
   body.print-checklist .ticket-head {
-    margin-bottom: 2px;
+    margin-bottom: 1.4mm;
+  }
+
+  body.print-checklist .ticket p {
+    padding: 0;
   }
 }
