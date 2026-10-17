@@ -1277,7 +1277,7 @@ function renderRevision() {
     .filter((sale) => inRevisionWindow(sale.date, snap))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   if (!sales.length) {
-    $("#salesList").innerHTML = `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — спишется с общего.</p>`;
+    $("#salesList").innerHTML = `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — с классика, премиума или Tangiers.</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
       <article class="card item group-${brandGroup(sale.product)}${sale.kind === "fruit" ? " group-fruit" : ""}">
@@ -1964,7 +1964,7 @@ $("#monthSaleForm")?.addEventListener("submit", (e) => {
   const modal = $("#confirmModal");
   const text = $("#confirmText");
   if (text) {
-    text.textContent = `Списать ${monthKey}: −${formatGrams(grams)} г и −${formatGrams(coals)} шт угля. Фрукт и недосдача с общего / выбранной группы.`;
+    text.textContent = `Списать ${monthKey}: −${formatGrams(grams)} г и −${formatGrams(coals)} шт угля. Фрукт и недосдача с выбранных групп.`;
   }
   if (modal) modal.hidden = false;
 });
