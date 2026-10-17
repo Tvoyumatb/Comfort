@@ -878,7 +878,7 @@ input[type="number"] {
   padding: 8px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+  gap: 0;
   margin-bottom: 16px;
 }
 
@@ -1004,7 +1004,7 @@ input[type="number"] {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     grid-auto-rows: 1fr;
-    gap: 2mm;
+    gap: 0;
     height: 287mm;
     margin: 0;
     padding: 0;
@@ -1014,12 +1014,13 @@ input[type="number"] {
   body.print-checklist .ticket {
     min-height: 0;
     height: 100%;
-    border: 1.6pt solid #000 !important;
+    border: 1.4pt solid #000 !important;
+    margin: 0;
     outline: 0;
     box-shadow: none !important;
-    font-size: 6.6pt;
-    line-height: 1.1;
-    padding: 2.2mm 2.4mm 2mm;
+    font-size: 7.2pt;
+    line-height: 1.12;
+    padding: 2.4mm 2.6mm 2.2mm;
     overflow: hidden;
   }
 
