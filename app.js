@@ -8,6 +8,8 @@ const VENUES = {
 
 const DEFAULT_GRAMS_PER_HOOKAH = 25;
 const DEFAULT_COALS_PER_HOOKAH = 5;
+const FRUIT_GRAMS = 40;
+const FRUIT_COALS = 7;
 const DEFAULT_COALS_PER_PACK = 72;
 const DEFAULT_STAFF_PER_DAY = 2;
 const OPENING_DATE = "2026-08-28";
@@ -943,10 +945,23 @@ function staffHookahsInWindow(fromDate) {
 }
 
 function saleKindLabel(kind) {
-  if (kind === "chef") return "Шеф";
+  if (kind === "chef") return "Шеф / недосдача";
+  if (kind === "fruit") return "На фрукте";
   if (kind === "month") return "Ушло за месяц";
   if (kind === "staff") return "Стафф";
   return "Продажа";
+}
+
+function gramsForKind(kind, hookahs) {
+  const n = Math.max(0, Number(hookahs) || 0);
+  if (kind === "fruit") return n * FRUIT_GRAMS;
+  return n * gramsPerHookah();
+}
+
+function coalsForKind(kind, hookahs) {
+  const n = Math.max(0, Number(hookahs) || 0);
+  if (kind === "fruit") return n * FRUIT_COALS;
+  return n * coalsPerHookah();
 }
 
 function coalsPerHookah() {
@@ -1033,12 +1048,12 @@ function salesForGroup(groupId, fromDate) {
 
 function saleGrams(sale) {
   if (sale.grams != null && sale.grams !== "") return Number(sale.grams || 0);
-  return Number(sale.hookahs || 0) * gramsPerHookah();
+  return gramsForKind(sale.kind || "sale", sale.hookahs);
 }
 
 function saleCoals(sale) {
   if (sale.coals != null && sale.coals !== "") return Number(sale.coals || 0);
-  return Number(sale.hookahs || 0) * coalsPerHookah();
+  return coalsForKind(sale.kind || "sale", sale.hookahs);
 }
 
 function soldGramsForGroup(groupId, fromDate) {
@@ -1190,6 +1205,8 @@ function renderRevision() {
   }
   const tangiersMonth = $("#monthTangiersWrap");
   if (tangiersMonth) tangiersMonth.hidden = db.current === "shishka";
+  const shortTangiers = document.querySelector('#monthSaleForm [name="shortGroup"] option[value="tangiers"]');
+  if (shortTangiers) shortTangiers.hidden = db.current === "shishka";
   const packInput = document.querySelector('#coalForm [name="perPack"]');
   if (packInput && document.activeElement !== packInput) {
     packInput.value = coalsPerPack();
@@ -1223,12 +1240,19 @@ function renderRevision() {
     return `
       <button type="button" class="sale-btn group-${group.id}" data-sale-group="${group.id}">
         <strong>${group.num}. ${group.title}</strong>
-        <span>${group.note}</span>
+        <span>${group.note} · ${gramsPerHookah()} г / ${coalsPerHookah()} угля</span>
         <b class="${remain <= 0 ? "low-stock" : ""}">${formatGrams(remain)} г</b>
         <em>списано ${sold} кальянов</em>
       </button>
     `;
-  }).join("");
+  }).join("") + `
+      <button type="button" class="sale-btn group-fruit" data-sale-fruit="classic">
+        <strong>На фрукте</strong>
+        <span>${FRUIT_GRAMS} г с общего + ${FRUIT_COALS} угля</span>
+        <b>${formatGrams(remainGroup(rev, "classic", snap))} г классик</b>
+        <em>любой табак, списание с общего</em>
+      </button>
+    `;
 
   const staffDays = daysOpenInWindow(snap);
   const staffHookahs = staffHookahsInWindow(snap);
@@ -1248,10 +1272,10 @@ function renderRevision() {
     .filter((sale) => inRevisionWindow(sale.date, snap))
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   if (!sales.length) {
-    $("#salesList").innerHTML = `<p class="empty">Шеф и продажи месяца появятся здесь. Стафф списывается сам.</p>`;
+    $("#salesList").innerHTML = `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — спишется с общего.</p>`;
   } else {
     $("#salesList").innerHTML = sales.map((sale) => `
-      <article class="card item group-${brandGroup(sale.product)}">
+      <article class="card item ${sale.kind === "fruit" ? "group-fruit" : `group-${brandGroup(sale.product)}`}">
         <div class="item-head">
           <h3>${escapeHtml(saleKindLabel(sale.kind))} · ${escapeHtml(groupTitle(brandGroup(sale.product)))} · ${formatGrams(saleGrams(sale))} г</h3>
           <button type="button" class="danger" data-del-sale="${sale.id}">Удалить</button>
@@ -1794,6 +1818,7 @@ function recordSale(groupId, hookahs, date, kind = "sale", extra = {}) {
     kind,
     ...(grams != null ? { grams } : {}),
     ...(coals != null ? { coals } : {}),
+    ...(extra.batch ? { batch: true } : {}),
   });
   save();
   renderRevision();
@@ -1805,7 +1830,7 @@ function openSaleConfirm(groupId, hookahs, date, kind = "sale") {
   const modal = $("#confirmModal");
   const text = $("#confirmText");
   if (text) {
-    text.textContent = `Списать ${saleKindLabel(kind).toLowerCase()} ${hookahs} × ${groupTitle(groupId)}? −${hookahs * gramsPerHookah()} г и −${hookahs * coalsPerHookah()} шт угля`;
+    text.textContent = `Списать ${saleKindLabel(kind).toLowerCase()} ${hookahs} × ${kind === "fruit" ? "фрукт" : groupTitle(groupId)}? −${gramsForKind(kind, hookahs)} г и −${coalsForKind(kind, hookahs)} шт угля`;
   }
   if (modal) modal.hidden = false;
 }
@@ -1817,10 +1842,15 @@ function closeSaleConfirm() {
 }
 
 $("#saleButtons").addEventListener("click", (e) => {
+  const fruitBtn = e.target.closest("[data-sale-fruit]");
   const btn = e.target.closest("[data-sale-group]");
-  if (!btn) return;
   const hookahs = Number(document.querySelector('#saleForm [name="hookahs"]')?.value || 1);
   const date = document.querySelector('#saleForm [name="date"]')?.value || toISODate(new Date());
+  if (fruitBtn) {
+    openSaleConfirm(fruitBtn.dataset.saleFruit || "classic", Math.max(1, hookahs), date, "fruit");
+    return;
+  }
+  if (!btn) return;
   openSaleConfirm(btn.dataset.saleGroup, Math.max(1, hookahs), date);
 });
 
@@ -1829,14 +1859,19 @@ $("#confirmOk")?.addEventListener("click", () => {
   if (pendingSale.kind === "month-batch") {
     const monthKey = pendingSale.monthKey;
     state.hookahSales = (state.hookahSales || []).filter((sale) => !(
-      sale.kind === "month" && String(sale.date || "").slice(0, 7) === monthKey
+      sale.batch && String(sale.date || "").slice(0, 7) === monthKey
     ));
-    pendingSale.rows.forEach((row) => recordSale(row.groupId, row.hookahs, row.date, "month", {
+    pendingSale.rows.forEach((row) => recordSale(row.groupId, row.hookahs, row.date, row.kind || "month", {
       grams: row.grams,
       coals: row.coals,
+      batch: true,
     }));
   } else {
-    recordSale(pendingSale.groupId, pendingSale.hookahs, pendingSale.date, pendingSale.kind || "sale");
+    const kind = pendingSale.kind || "sale";
+    recordSale(pendingSale.groupId, pendingSale.hookahs, pendingSale.date, kind, {
+      grams: gramsForKind(kind, pendingSale.hookahs),
+      coals: coalsForKind(kind, pendingSale.hookahs),
+    });
   }
   closeSaleConfirm();
 });
@@ -1865,38 +1900,58 @@ $("#monthSaleForm")?.addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const date = monthEnd(data.month);
-  const coalQty = Math.max(0, Number(data.coals || 0));
   const rows = SALE_GROUPS
     .filter((group) => db.current !== "shishka" || group.id !== "tangiers")
     .map((group) => {
-      const grams = Math.max(0, Number(data[group.id] || 0));
+      const hookahs = Math.max(0, Number(data[group.id] || 0));
       return {
         groupId: group.id,
-        grams,
-        hookahs: Math.round(grams / gramsPerHookah()),
-        coals: 0,
+        hookahs,
+        grams: gramsForKind("sale", hookahs),
+        coals: coalsForKind("sale", hookahs),
+        kind: "month",
         date,
       };
     })
-    .filter((row) => row.grams > 0);
-  if (coalQty && rows[0]) rows[0].coals = coalQty;
-  else if (coalQty) {
+    .filter((row) => row.hookahs > 0);
+  const fruit = Math.max(0, Number(data.fruit || 0));
+  if (fruit) {
     rows.push({
       groupId: "classic",
-      grams: 0,
-      hookahs: 0,
-      coals: coalQty,
+      hookahs: fruit,
+      grams: gramsForKind("fruit", fruit),
+      coals: coalsForKind("fruit", fruit),
+      kind: "fruit",
+      date,
+    });
+  }
+  const shortGrams = Math.max(0, Number(data.shortage || 0));
+  const shortGroup = SALE_GROUPS.some((group) => group.id === data.shortGroup)
+    ? data.shortGroup
+    : "classic";
+  const shortKind = data.shortAs === "fruit" ? "fruit" : "chef";
+  if (shortGrams) {
+    const shortHookahs = shortKind === "fruit"
+      ? Math.round(shortGrams / FRUIT_GRAMS)
+      : Math.round(shortGrams / gramsPerHookah());
+    rows.push({
+      groupId: shortGroup,
+      hookahs: shortHookahs,
+      grams: shortGrams,
+      coals: shortKind === "fruit" ? shortHookahs * FRUIT_COALS : 0,
+      kind: shortKind,
       date,
     });
   }
   if (!rows.length) return;
   const monthKey = String(data.month || date.slice(0, 7));
   const grams = rows.reduce((sum, row) => sum + row.grams, 0);
+  const coals = rows.reduce((sum, row) => sum + row.coals, 0);
   pendingSale = { kind: "month-batch", rows, monthKey };
   const modal = $("#confirmModal");
   const text = $("#confirmText");
   if (text) {
-    text.textContent = `Списать уход ${monthKey}: −${formatGrams(grams)} г табака${coalQty ? ` и −${formatGrams(coalQty)} шт угля` : ""}?`;
+    text.textContent = `Списать ${monthKey}: −${formatGrams(grams)} г и −${formatGrams(coals)} шт угля. Фрукт и недосдача с общего / выбранной группы.`;
   }
   if (modal) modal.hidden = false;
 });

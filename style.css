@@ -595,6 +595,12 @@ input[type="number"] {
   background: color-mix(in srgb, #ff6b35 22%, var(--card));
 }
 
+.sale-btn.group-fruit,
+.item.group-fruit {
+  border-color: #7dcea0;
+  background: color-mix(in srgb, #7dcea0 18%, var(--card));
+}
+
 .item.group-coal,
 .stat.group-coal {
   border-color: var(--coal);
@@ -613,6 +619,7 @@ input[type="number"] {
 .stat.group-premium b { color: #e9c6ff; }
 .sale-btn.group-tangiers b,
 .stat.group-tangiers b { color: #ffb08a; }
+.sale-btn.group-fruit b { color: #b7f0d0; }
 
 .sheet-row.group-classic,
 .sheet-row.group-premium,
