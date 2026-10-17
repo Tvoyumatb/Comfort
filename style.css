@@ -911,6 +911,12 @@ input[type="number"] {
   font-size: 14px;
 }
 
+.report-bar .ghost {
+  color: #111;
+  border: 1px solid #777;
+  background: #fff;
+}
+
 .report-paper {
   max-width: 1180px;
   margin: 0 auto;
@@ -946,11 +952,33 @@ input[type="number"] {
   font-size: 18px;
 }
 
+.report-paper .excel-card,
+.report-paper .roster-wrap,
+.report-paper .pay-wrap {
+  overflow: visible;
+}
+
+.report-paper .roster,
+.report-paper .pay {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+
+.report-paper .roster .name,
+.report-paper .pay .name {
+  position: static;
+  min-width: 0;
+  max-width: none;
+  width: 16%;
+}
+
 .report-paper .cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: 28px;
+  font-size: 11px;
   cursor: default;
 }
 
