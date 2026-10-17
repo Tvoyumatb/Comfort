@@ -970,12 +970,12 @@ function renderReport() {
       </p>
     </header>
 
-    <div class="excel-card">
-      <table class="roster"><thead>${rosterHead}</thead><tbody>${rosterBody}</tbody></table>
+    <div class="excel-card report-roster">
+      <table class="roster" style="--rows:${state.employees.length}"><thead>${rosterHead}</thead><tbody>${rosterBody}</tbody></table>
     </div>
 
-    <div class="excel-card">
-      <table class="pay">
+    <div class="excel-card report-pay">
+      <table class="pay" style="--rows:${state.employees.length + 1}">
         <thead>
           <tr>
             <th class="name">Сотрудник</th>
