@@ -883,6 +883,97 @@ input[type="number"] {
   font-weight: 800;
 }
 
+.report-view {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: auto;
+  background: #fff;
+  color: #111;
+}
+
+.report-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f4f4f4;
+  border-bottom: 1px solid #ccc;
+  color: #222;
+}
+
+.report-bar p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.report-paper {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  background: #fff;
+  color: #111;
+}
+
+.report-head h1 {
+  margin: 0 0 8px;
+  color: #111;
+  font-size: 26px;
+}
+
+.report-kicker {
+  margin: 0 0 4px;
+  color: #555;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.report-rates {
+  margin: 0 0 16px;
+  color: #333;
+  font-size: 13px;
+}
+
+.report-paper h2 {
+  margin: 18px 0 8px;
+  color: #111;
+  font-size: 18px;
+}
+
+.report-paper .cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  cursor: default;
+}
+
+.report-empty {
+  margin: 0 0 12px;
+  color: #444;
+}
+
+.report-table {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+body.report-open {
+  max-width: none;
+  margin: 0;
+  background: #fff;
+}
+
+body.report-open::before {
+  display: none;
+}
+
 .stock-table input {
   min-width: 64px;
 }
@@ -1090,5 +1181,29 @@ input[type="number"] {
     width: 3.2mm;
     height: 2.4mm;
     border-bottom: 1.1pt solid #000;
+  }
+
+  body.print-report {
+    background: #fff;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    color: #111;
+  }
+
+  body.print-report > *:not(#reportView),
+  body.print-report .report-bar {
+    display: none !important;
+  }
+
+  body.print-report #reportView {
+    position: static;
+    display: block !important;
+    overflow: visible;
+  }
+
+  body.print-report .report-paper {
+    max-width: none;
+    padding: 0;
   }
 }

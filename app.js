@@ -859,6 +859,171 @@ function renderShifts() {
   renderRoster();
   renderPay();
   renderFines();
+  if (!$("#reportView")?.hidden) renderReport();
+}
+
+function reportPeriodLabel() {
+  const days = periodDays();
+  return `${MONTHS_RU[viewMonth.getMonth()]} ${days[0].getDate()}–${days[days.length - 1].getDate()} ${viewMonth.getFullYear()}`;
+}
+
+function renderReport() {
+  const paper = $("#reportPaper");
+  if (!paper) return;
+  const days = periodDays();
+  const rosterHead = `
+    <tr>
+      <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
+      ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
+    </tr>
+  `;
+  const rosterBody = state.employees.map((emp) => `
+    <tr>
+      <th class="name">${escapeHtml(emp.name)}</th>
+      ${days.map((date) => {
+        const type = state.schedule[toISODate(date)]?.[emp.id] || "";
+        const cls = shiftClass(type, date);
+        return `<td><span class="cell ${cls}">${SHIFT_LABEL[type]}</span></td>`;
+      }).join("")}
+    </tr>
+  `).join("");
+
+  const payRows = state.employees.map((emp) => {
+    const c = countShifts(emp.id);
+    const extra = extrasFor(emp.id);
+    return `
+      <tr>
+        <th class="name">${escapeHtml(emp.name)}</th>
+        <td>${c.morning}</td>
+        <td>${c.eveningWeekday}</td>
+        <td>${c.eveningWeekend}</td>
+        <td>${c.intern}</td>
+        <td>${formatSum(extra.fines || 0)}</td>
+        <td>${formatSum(extra.advances || 0)}</td>
+        <td>${formatSum(damageTotal(emp.id))}</td>
+        <td class="sum">${formatSum(payout(emp.id))}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const lateFines = state.employees
+    .map((emp) => ({ name: emp.name, sum: Number(extrasFor(emp.id).fines || 0) }))
+    .filter((row) => row.sum > 0);
+  const damages = (state.fines || [])
+    .filter((f) => inCurrentPeriod(f.date))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const lateTotal = lateFines.reduce((sum, row) => sum + row.sum, 0);
+  const damageSum = damages.reduce((sum, f) => sum + Number(f.sum || 0), 0);
+  const advanceTotal = state.employees.reduce((sum, emp) => sum + Number(extrasFor(emp.id).advances || 0), 0);
+  const payTotal = state.employees.reduce((sum, emp) => sum + payout(emp.id), 0);
+
+  const lateTable = lateFines.length
+    ? `<table class="pay report-table">
+        <thead><tr><th class="name">Сотрудник</th><th>Штраф</th></tr></thead>
+        <tbody>
+          ${lateFines.map((row) => `<tr><th class="name">${escapeHtml(row.name)}</th><td class="sum">${formatSum(row.sum)}</td></tr>`).join("")}
+          <tr><th class="name">Итого штрафы</th><td class="sum">${formatSum(lateTotal)}</td></tr>
+        </tbody>
+      </table>`
+    : `<p class="report-empty">Штрафов за опоздание нет</p>`;
+
+  const damageTable = damages.length
+    ? `<table class="pay report-table">
+        <thead>
+          <tr>
+            <th>Дата</th>
+            <th class="name">Сотрудник</th>
+            <th class="name">Что</th>
+            <th>Шт</th>
+            <th>Сумма</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${damages.map((f) => {
+            const emp = state.employees.find((e) => e.id === f.empId);
+            return `<tr>
+              <td>${parseISODate(f.date).toLocaleDateString("ru-RU")}</td>
+              <th class="name">${escapeHtml(emp?.name || "Сотрудник")}</th>
+              <th class="name">${escapeHtml(f.what)}</th>
+              <td>${f.qty}</td>
+              <td class="sum">${formatSum(f.sum)}</td>
+            </tr>`;
+          }).join("")}
+          <tr><th colspan="4" class="name">Итого порча</th><td class="sum">${formatSum(damageSum)}</td></tr>
+        </tbody>
+      </table>`
+    : `<p class="report-empty">Порчи за период нет</p>`;
+
+  paper.innerHTML = `
+    <header class="report-head">
+      <p class="report-kicker">${escapeHtml(venueName())}</p>
+      <h1>Табель · ${reportPeriodLabel()}</h1>
+      <p class="report-rates">
+        Утро ${formatSum(state.rates.morning)} ·
+        Вечер будни ${formatSum(state.rates.eveningWeekday)} ·
+        Вечер пт–вс ${formatSum(state.rates.eveningWeekend)} ·
+        Стажировка ${formatSum(state.rates.intern)}
+      </p>
+    </header>
+
+    <h2>Смены</h2>
+    <div class="excel-card">
+      <div class="roster-wrap">
+        <table class="roster"><thead>${rosterHead}</thead><tbody>${rosterBody}</tbody></table>
+      </div>
+    </div>
+
+    <h2>Расчёт</h2>
+    <div class="excel-card">
+      <div class="pay-wrap">
+        <table class="pay">
+          <thead>
+            <tr>
+              <th class="name">Сотрудник</th>
+              <th>Утро</th>
+              <th>Вечер будние</th>
+              <th>Вечер выходные</th>
+              <th>Стажировка</th>
+              <th>Штрафы</th>
+              <th>Авансы</th>
+              <th>Порча</th>
+              <th>К выплате</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${payRows}
+            <tr>
+              <th class="name">Итого</th>
+              <td></td><td></td><td></td><td></td>
+              <td class="sum">${formatSum(lateTotal)}</td>
+              <td class="sum">${formatSum(advanceTotal)}</td>
+              <td class="sum">${formatSum(damageSum)}</td>
+              <td class="sum">${formatSum(payTotal)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2>Штрафы</h2>
+    ${lateTable}
+
+    <h2>Порча — колба, чаша и другое</h2>
+    ${damageTable}
+  `;
+}
+
+function openReport() {
+  renderReport();
+  const view = $("#reportView");
+  if (view) view.hidden = false;
+  document.body.classList.add("report-open");
+}
+
+function closeReport() {
+  const view = $("#reportView");
+  if (view) view.hidden = true;
+  document.body.classList.remove("report-open", "print-report");
 }
 
 function cycleCell(btn) {
@@ -2318,14 +2483,23 @@ $("#importFile")?.addEventListener("change", (e) => {
   if (file) importDb(file);
 });
 
+$("#reportBtn")?.addEventListener("click", () => openReport());
+$("#reportClose")?.addEventListener("click", () => closeReport());
+
 $("#printBtn").addEventListener("click", () => {
-  const onSheet = document.querySelector(".tab.is-active")?.dataset.tab === "checklist";
+  const tab = document.querySelector(".tab.is-active")?.dataset.tab;
+  const onSheet = tab === "checklist";
+  const onTimesheet = tab === "shifts" || document.body.classList.contains("report-open");
   document.body.classList.toggle("print-checklist", onSheet);
+  if (onTimesheet && !onSheet) {
+    openReport();
+    document.body.classList.add("print-report");
+  }
   window.print();
 });
 
 window.addEventListener("afterprint", () => {
-  document.body.classList.remove("print-checklist");
+  document.body.classList.remove("print-checklist", "print-report");
 });
 
 if ("serviceWorker" in navigator) {
