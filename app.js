@@ -41,8 +41,10 @@ const PREMIUM_BRANDS = [
   "troffimofs",
 ];
 
+const CLASSIC_PACK_BRANDS = ["Banger", "Blackburn", "Bliss", "Chabacco"];
+
 const DEFAULT_BRANDS = [
-  "Blackburn/banger/bliss/chabacco",
+  ...CLASSIC_PACK_BRANDS,
   "Overdose",
   "Sarma",
   "Severniy/Oven",
@@ -487,10 +489,16 @@ function normalizeVenue(data, venueId) {
     invoicesFromStartV1: Boolean(data.invoicesFromStartV1),
     monthlyCountV1: Boolean(data.monthlyCountV1),
   };
-  return applyMonthlyCount(applyStartInvoices(
+  return applySplitClassicPack(applyMonthlyCount(applyStartInvoices(
     shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId),
     venueId
-  ));
+  )));
+}
+
+function applySplitClassicPack(data) {
+  if (!data) return data;
+  (data.revisions || []).forEach((rev) => splitCombinedClassicPack(rev));
+  return data;
 }
 
 function applyMonthlyCount(data) {
@@ -1384,11 +1392,33 @@ function defaultBrandItems(venueId = db.current) {
   return items.filter((item) => venueId !== "shishka" || item.group !== "tangiers");
 }
 
+function isCombinedClassicPack(name) {
+  const n = normalizeName(name);
+  if (CLASSIC_PACK_BRANDS.some((brand) => n === normalizeName(brand))) return false;
+  return /blackburn/i.test(n) && /banger/i.test(n);
+}
+
+function splitCombinedClassicPack(rev) {
+  if (!rev?.items) return false;
+  const idx = rev.items.findIndex((item) => isCombinedClassicPack(item.name));
+  if (idx < 0) return false;
+  const old = rev.items[idx];
+  const group = old.group || "classic";
+  const have = new Set(rev.items.map((item) => normalizeName(item.name)));
+  const added = CLASSIC_PACK_BRANDS
+    .filter((name) => !have.has(normalizeName(name)))
+    .map((name) => ({ name, grams: 0, group }));
+  rev.items.splice(idx, 1, ...added);
+  return true;
+}
+
 function fillRevisionBrands(rev) {
   if (!rev.items) rev.items = [];
+  const split = splitCombinedClassicPack(rev);
   rev.items.forEach((item) => {
     if (!item.group) item.group = brandGroup(item.name);
   });
+  return split;
 }
 
 function revisionForMonth(iso) {
@@ -1410,7 +1440,7 @@ function ensureRevision(date) {
     state.revisions.push(rev);
     save();
   } else {
-    fillRevisionBrands(rev);
+    if (fillRevisionBrands(rev)) save();
   }
   return rev;
 }
@@ -2915,9 +2945,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "56") {
+  if (localStorage.getItem("journal-sw") !== "57") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "56");
+    localStorage.setItem("journal-sw", "57");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();
