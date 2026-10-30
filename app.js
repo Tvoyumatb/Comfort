@@ -98,7 +98,7 @@ const MONTHS_RU = [
 const INCOME = {
   tobacco: {
     title: "Приход табака",
-    hint: "Выбери тип табака, укажи граммы и нажми «Записать приход»",
+    hint: "Только чеки, которые скинул. Это не ревизия — забытые накладные сюда можно не догонять",
     name: "Марка",
     placeholder: "Например Starline",
     qty: "Граммы",
@@ -1423,7 +1423,7 @@ function prevMonthRevision(fromDate) {
 function usedGramsForGroup(rev, groupId, fromDate) {
   const prev = prevMonthRevision(fromDate);
   const before = prev ? snapshotGramsForGroup(prev, groupId) : 0;
-  return before + incomeGramsForGroup(groupId, fromDate) - snapshotGramsForGroup(rev, groupId);
+  return before - snapshotGramsForGroup(rev, groupId);
 }
 
 function usedGramsForItem(rev, item, fromDate) {
@@ -1431,12 +1431,12 @@ function usedGramsForItem(rev, item, fromDate) {
   const prevItem = (prev?.items || []).find((row) =>
     itemGroup(row) === itemGroup(item) && normalizeName(row.name) === normalizeName(item.name)
   );
-  return Number(prevItem?.grams || 0) + incomeForItem(rev, item, fromDate) - Number(item.grams || 0);
+  return Number(prevItem?.grams || 0) - Number(item.grams || 0);
 }
 
 function usedCoals(rev, fromDate) {
   const prev = prevMonthRevision(fromDate);
-  return Number(prev?.coals || 0) + incomeCoals(fromDate) - Number(rev.coals || 0);
+  return Number(prev?.coals || 0) - Number(rev.coals || 0);
 }
 
 function revisionTotal(rev) {
@@ -1813,11 +1813,9 @@ function renderRevision() {
   const snap = rev.date;
   const prev = prevMonthRevision(snap);
   const prevTotal = prev ? revisionTotal(prev) : 0;
-  const incomeTotal = REVISION_GROUPS.reduce((sum, group) => sum + incomeGramsForGroup(group.id, snap), 0);
-  const usedTotal = prevTotal + incomeTotal - revisionTotal(rev);
+  const usedTotal = prevTotal - revisionTotal(rev);
   const coalsUsed = usedCoals(rev, snap);
   $("#revisionPrev").textContent = formatGrams(prevTotal);
-  $("#revisionIncome").textContent = formatGrams(incomeTotal);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionUsed").textContent = formatGrams(usedTotal);
   const coalsRemain = $("#coalsRemain");
@@ -1838,11 +1836,10 @@ function renderRevision() {
       if (!rows.length) return "";
       const used = usedGramsForGroup(rev, group.id, snap);
       const list = rows.map(({ item, index }) => {
-        const income = incomeForItem(rev, item, snap);
         const gone = usedGramsForItem(rev, item, snap);
         return `
           <div class="sheet-row rev-item group-${group.id}">
-            <span>${escapeHtml(item.name)} <small>приход ${formatGrams(income)} г · ушло ${formatGrams(gone)} г</small></span>
+            <span>${escapeHtml(item.name)} <small>ушло по ревизии ${formatGrams(gone)} г</small></span>
             <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
             <button type="button" class="danger compact" data-del-brand="${index}" aria-label="Удалить">×</button>
           </div>
@@ -2328,11 +2325,9 @@ $("#revisionRows").addEventListener("input", (e) => {
   save();
   const prev = prevMonthRevision(rev.date);
   const prevTotal = prev ? revisionTotal(prev) : 0;
-  const incomeTotal = REVISION_GROUPS.reduce((sum, group) => sum + incomeGramsForGroup(group.id, rev.date), 0);
   if ($("#revisionPrev")) $("#revisionPrev").textContent = formatGrams(prevTotal);
-  if ($("#revisionIncome")) $("#revisionIncome").textContent = formatGrams(incomeTotal);
   if ($("#revisionTotal")) $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  if ($("#revisionUsed")) $("#revisionUsed").textContent = formatGrams(prevTotal + incomeTotal - revisionTotal(rev));
+  if ($("#revisionUsed")) $("#revisionUsed").textContent = formatGrams(prevTotal - revisionTotal(rev));
 });
 
 $("#revisionRows").addEventListener("click", (e) => {
@@ -2909,9 +2904,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "54") {
+  if (localStorage.getItem("journal-sw") !== "55") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "54");
+    localStorage.setItem("journal-sw", "55");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();

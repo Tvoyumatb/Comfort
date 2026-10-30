@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=54">
+  <link rel="stylesheet" href="style.css?v=55">
 </head>
 <body>
   <header class="topbar no-print">
@@ -106,7 +106,7 @@
         <button type="button" class="icon-btn" id="prevRevMonth" aria-label="Предыдущий месяц">‹</button>
         <div class="period-label">
           <strong id="revMonthLabel">—</strong>
-          <span>Сравни остаток и приход — сколько ушло за месяц</span>
+          <span>Только остаток по снятию. Чеки — во вкладке Приход</span>
         </div>
         <button type="button" class="icon-btn" id="nextRevMonth" aria-label="Следующий месяц">›</button>
       </div>
@@ -133,15 +133,11 @@
           <strong id="revisionPrev">0</strong>
         </div>
         <div class="sheet-row total">
-          <span>Приход за этот месяц</span>
-          <strong id="revisionIncome">0</strong>
-        </div>
-        <div class="sheet-row total">
           <span>Остаток на снятии</span>
           <strong id="revisionTotal">0</strong>
         </div>
         <div class="sheet-row total">
-          <span>Ушло за месяц</span>
+          <span>Ушло по ревизии</span>
           <strong id="revisionUsed">0</strong>
         </div>
         <label class="sheet-row coals" id="coalsInputRow">
@@ -152,7 +148,7 @@
           <span>Ушло углей за месяц</span>
           <strong id="coalsRemain">0 шт</strong>
         </div>
-        <p class="hint">Ушло = остаток прошлого месяца + приход − остаток этого месяца. Марки добавляй сам.</p>
+        <p class="hint">Ушло по ревизии = прошлый остаток − нынешний. Приход по чекам сюда не входит — его смотри отдельно во вкладке Приход, даже если какие-то накладные забыл.</p>
       </div>
     </section>
 
@@ -160,7 +156,7 @@
       <div class="period-bar">
         <p class="period-label">
           <strong id="incomeTitle">Приход табака</strong>
-          <span id="incomeHint">Поступления в граммах</span>
+          <span id="incomeHint">Только чеки. К ревизии не привязано</span>
         </p>
       </div>
 
@@ -280,6 +276,6 @@
     <article class="report-paper" id="reportPaper"></article>
   </div>
 
-  <script src="app.js?v=54"></script>
+  <script src="app.js?v=55"></script>
 </body>
 </html>
