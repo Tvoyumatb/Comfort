@@ -25,6 +25,13 @@ const SALE_GROUPS = [
   { id: "tangiers", num: "3", title: "Tangiers", note: "Tangiers-акция" },
 ];
 
+const REVISION_GROUPS = [
+  { id: "classic", title: "Классик", note: "Smoke break" },
+  { id: "premium", title: "Премиум", note: "Bonche, Jent Cigar, Troffimoff's" },
+  { id: "fruit", title: "Фрукт", note: "Табак на фрукте, 40 г" },
+  { id: "tangiers", title: "Tangiers", note: "Tangiers-акция" },
+];
+
 const PREMIUM_BRANDS = [
   "bonche",
   "jent cigar",
@@ -125,6 +132,7 @@ const db = loadDb();
 let state = db.venues[db.current];
 let shownRevDate = OPENING_DATE;
 let pendingSale = null;
+let viewRevMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let viewMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let half = new Date().getDate() > 15 ? 1 : 0;
 let incomingKind = "tobacco";
@@ -1349,7 +1357,11 @@ function setTodayDefaults() {
   document.querySelector('#tobaccoForm [name="date"]').value = today;
   const fineDate = document.querySelector('#fineForm [name="date"]');
   if (fineDate) fineDate.value = today;
-  if (!$("#revisionDate").value) $("#revisionDate").value = OPENING_DATE;
+  if (!$("#revisionDate").value) {
+    $("#revisionDate").value = todayISO();
+    const now = new Date();
+    viewRevMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
   const saleDate = document.querySelector('#saleForm [name="date"]');
   if (saleDate) saleDate.value = today;
   const coalDate = document.querySelector('#coalForm [name="date"]');
@@ -1362,18 +1374,54 @@ function setTodayDefaults() {
   }
 }
 
+function defaultBrandItems(venueId = db.current) {
+  const items = DEFAULT_BRANDS.map((name) => ({
+    name,
+    grams: 0,
+    group: brandGroup(name),
+  }));
+  if (venueId !== "shishka" && !items.some((item) => item.group === "tangiers")) {
+    items.push({ name: "Tangiers", grams: 0, group: "tangiers" });
+  }
+  return items.filter((item) => venueId !== "shishka" || item.group !== "tangiers");
+}
+
+function fillRevisionBrands(rev) {
+  if (!rev.items) rev.items = [];
+  const have = new Set(rev.items.map((item) => normalizeName(item.name)));
+  defaultBrandItems().forEach((item) => {
+    if (!have.has(normalizeName(item.name))) rev.items.push({ ...item });
+  });
+  rev.items.forEach((item) => {
+    if (!item.group) item.group = brandGroup(item.name);
+  });
+}
+
+function revisionForMonth(iso) {
+  const key = monthKey(parseISODate(iso));
+  return (state.revisions || [])
+    .filter((rev) => monthKey(parseISODate(rev.date)) === key)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+}
+
 function ensureRevision(date) {
-  let rev = state.revisions.find((r) => r.date === date);
+  const iso = date || toISODate(viewRevMonth);
+  let rev = revisionForMonth(iso);
   if (!rev) {
-    const extra = [...new Set(state.revisions.flatMap((r) => r.items.map((i) => i.name)))]
-      .filter((name) => !DEFAULT_BRANDS.includes(name));
+    const extra = [...new Set((state.revisions || []).flatMap((row) => (row.items || []).map((item) => item.name)))]
+      .filter((name) => !DEFAULT_BRANDS.includes(name) && name !== "Tangiers" && !isGroupTitleName(name));
     rev = {
-      date,
+      date: clampDateToMonth(iso, iso),
       coals: 0,
-      items: [...DEFAULT_BRANDS, ...extra].map((name) => ({ name, grams: 0 })),
+      items: [
+        ...defaultBrandItems(),
+        ...extra.map((name) => ({ name, grams: 0, group: brandGroup(name) })),
+      ],
     };
     state.revisions.push(rev);
     save();
+  } else {
+    fillRevisionBrands(rev);
   }
   return rev;
 }
@@ -1394,14 +1442,40 @@ function todayISO() {
   return toISODate(new Date());
 }
 
+function lastDayOfMonthISO(iso) {
+  const date = parseISODate(iso);
+  return toISODate(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+}
+
+function monthStartISO(iso) {
+  const date = parseISODate(iso);
+  const start = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-01`;
+  if (monthKey(date) === monthKey(parseISODate(OPENING_DATE)) && start < OPENING_DATE) {
+    return OPENING_DATE;
+  }
+  return start;
+}
+
+function monthEndISO(iso) {
+  const date = parseISODate(iso);
+  return toISODate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
+}
+
+function clampDateToMonth(iso, monthISO) {
+  const start = monthStartISO(monthISO);
+  const last = lastDayOfMonthISO(monthISO);
+  if (!iso || iso < start) return start;
+  if (iso > last) return last;
+  return iso;
+}
+
 function daysOpenInWindow(fromDate) {
-  const cap = parseISODate(todayISO());
-  const monthStart = new Date(cap.getFullYear(), cap.getMonth(), 1);
-  const windowStart = parseISODate(fromDate);
-  const start = windowStart > monthStart ? windowStart : monthStart;
-  const until = parseISODate(nextRevisionDate(fromDate));
-  until.setDate(until.getDate() - 1);
-  const end = cap < until ? cap : until;
+  const today = parseISODate(todayISO());
+  const month = parseISODate(fromDate);
+  if (monthKey(month) > monthKey(today)) return 0;
+  const start = parseISODate(monthStartISO(fromDate));
+  const last = parseISODate(lastDayOfMonthISO(fromDate));
+  const end = monthKey(month) === monthKey(today) ? (today < last ? today : last) : last;
   if (end < start) return 0;
   return Math.round((end - start) / 86400000) + 1;
 }
@@ -1479,7 +1553,8 @@ function normalizeName(name) {
 
 function brandGroup(name) {
   const n = normalizeName(name).replace(/\s+/g, " ");
-  if (["classic", "premium", "tangiers"].includes(n)) return n;
+  if (["classic", "premium", "tangiers", "fruit"].includes(n)) return n;
+  if (n.includes("фрукт") || n.includes("fruit")) return "fruit";
   if (n.includes("tangiers") || n === "tng" || n.startsWith("tng ") || n.includes("танж")) {
     return "tangiers";
   }
@@ -1493,19 +1568,25 @@ function brandGroup(name) {
   return "classic";
 }
 
-function groupTitle(id) {
-  return SALE_GROUPS.find((group) => group.id === id)?.title || id;
+function itemGroup(item) {
+  if (item?.group && REVISION_GROUPS.some((group) => group.id === item.group)) return item.group;
+  return brandGroup(item?.name);
 }
 
-function nextRevisionDate(fromDate) {
-  return (state.revisions || [])
-    .map((rev) => rev.date)
-    .filter((date) => date > fromDate)
-    .sort()[0] || "9999-12-31";
+function isGroupTitleName(name) {
+  const n = normalizeName(name);
+  return REVISION_GROUPS.some((group) => n === group.id || n === normalizeName(group.title));
+}
+
+function groupTitle(id) {
+  return REVISION_GROUPS.find((group) => group.id === id)?.title
+    || SALE_GROUPS.find((group) => group.id === id)?.title
+    || id;
 }
 
 function inRevisionWindow(iso, fromDate) {
-  return iso >= fromDate && iso < nextRevisionDate(fromDate);
+  if (!iso) return false;
+  return iso >= monthStartISO(fromDate) && iso < monthEndISO(fromDate);
 }
 
 function salesForGroup(groupId, fromDate) {
@@ -1525,6 +1606,11 @@ function saleCoals(sale) {
 }
 
 function soldGramsForGroup(groupId, fromDate) {
+  if (groupId === "fruit") {
+    return (state.hookahSales || [])
+      .filter((sale) => sale.kind === "fruit" && inRevisionWindow(sale.date, fromDate))
+      .reduce((sum, sale) => sum + saleGrams(sale), 0);
+  }
   const recorded = salesForGroup(groupId, fromDate).reduce((sum, sale) => sum + saleGrams(sale), 0);
   const staff = groupId === "classic" ? staffHookahsInWindow(fromDate) * gramsPerHookah() : 0;
   return recorded + staff;
@@ -1542,21 +1628,36 @@ function incomeGramsForGroup(groupId, fromDate) {
   return (state.tobacco || [])
     .filter((row) => (row.kind || "tobacco") === "tobacco"
       && rowGroup(row) === groupId
-      && row.date >= fromDate
-      && row.date < nextRevisionDate(fromDate))
+      && inRevisionWindow(row.date, fromDate))
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
+function incomeForItem(rev, item, fromDate) {
+  const groupId = itemGroup(item);
+  const brands = (rev.items || []).filter((row) => itemGroup(row) === groupId && !isGroupTitleName(row.name));
+  return (state.tobacco || [])
+    .filter((row) => (row.kind || "tobacco") === "tobacco"
+      && rowGroup(row) === groupId
+      && inRevisionWindow(row.date, fromDate))
+    .filter((row) => {
+      if (isGroupTitleName(item.name)) {
+        return !brands.some((brand) => normalizeName(brand.name) === normalizeName(row.product));
+      }
+      return normalizeName(row.product) === normalizeName(item.name);
+    })
     .reduce((sum, row) => sum + Number(row.qty || 0), 0);
 }
 
 function snapshotGramsForGroup(rev, groupId) {
   return rev.items
-    .filter((item) => brandGroup(item.name) === groupId)
+    .filter((item) => itemGroup(item) === groupId)
     .reduce((sum, item) => sum + Number(item.grams || 0), 0);
 }
 
 function remainGroup(rev, groupId, fromDate) {
-  return snapshotGramsForGroup(rev, groupId)
-    + incomeGramsForGroup(groupId, fromDate)
-    - soldGramsForGroup(groupId, fromDate);
+  const snap = snapshotGramsForGroup(rev, groupId) + incomeGramsForGroup(groupId, fromDate);
+  if (groupId === "fruit") return snap;
+  return snap - soldGramsForGroup(groupId, fromDate);
 }
 
 function soldHookahsTotal(fromDate) {
@@ -1595,9 +1696,7 @@ function saleCard(sale) {
 
 function incomeCoals(fromDate) {
   return (state.tobacco || [])
-    .filter((row) => row.kind === "coal"
-      && row.date >= fromDate
-      && row.date < nextRevisionDate(fromDate))
+    .filter((row) => row.kind === "coal" && inRevisionWindow(row.date, fromDate))
     .reduce((sum, row) => sum + Number(row.qty || 0), 0);
 }
 
@@ -1641,7 +1740,11 @@ function isEmptyRevision(rev) {
 
 function pruneEmptyRevisions() {
   if (!Array.isArray(state.revisions)) return;
-  const next = state.revisions.filter((rev) => !isEmptyRevision(rev) || rev.date === OPENING_DATE);
+  const keepMonth = monthKey(viewRevMonth);
+  const next = state.revisions.filter((rev) => {
+    if (!isEmptyRevision(rev) || rev.date === OPENING_DATE) return true;
+    return monthKey(parseISODate(rev.date)) === keepMonth;
+  });
   if (next.length !== state.revisions.length) {
     state.revisions = next;
     save();
@@ -1649,9 +1752,7 @@ function pruneEmptyRevisions() {
 }
 
 function shownRevision() {
-  return (state.revisions || []).find((row) => row.date === shownRevDate)
-    || latestRevision(shownRevDate)
-    || ensureRevision(OPENING_DATE);
+  return ensureRevision($("#revisionDate")?.value || toISODate(viewRevMonth));
 }
 
 function formatGrams(n) {
@@ -1667,10 +1768,27 @@ function latestRevision(date) {
 function renderRevision() {
   resetStock(state, db.current);
   pruneEmptyRevisions();
-  const date = $("#revisionDate").value || OPENING_DATE;
-  const exact = (state.revisions || []).find((row) => row.date === date && !isEmptyRevision(row));
-  const rev = exact || latestRevision(date) || ensureRevision(OPENING_DATE);
+  const monthISO = toISODate(viewRevMonth);
+  const dateInput = $("#revisionDate");
+  if (dateInput) {
+    const min = monthStartISO(monthISO);
+    const max = lastDayOfMonthISO(monthISO);
+    dateInput.min = min;
+    dateInput.max = max;
+    if (document.activeElement !== dateInput) {
+      dateInput.value = clampDateToMonth(dateInput.value || max, monthISO);
+    }
+  }
+  const date = dateInput?.value || lastDayOfMonthISO(monthISO);
+  const rev = ensureRevision(date);
+  rev.date = clampDateToMonth(date, monthISO);
   shownRevDate = rev.date;
+  const monthLabel = $("#revMonthLabel");
+  if (monthLabel) {
+    monthLabel.textContent = `${MONTHS_RU[viewRevMonth.getMonth()]} ${viewRevMonth.getFullYear()}`;
+  }
+  const tangiersBrandOpt = document.querySelector('#addBrandForm [name="group"] option[value="tangiers"]');
+  if (tangiersBrandOpt) tangiersBrandOpt.hidden = db.current === "shishka";
   const coalKinds = ensureCoalStock();
   const coalKindRows = $("#coalKindRows");
   if (coalKindRows) {
@@ -1727,14 +1845,39 @@ function renderRevision() {
   }
   const coalsWarn = $("#coalsWarn");
   if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || coalsNow > 0;
-  $("#revisionRows").innerHTML = rev.items.map((item, index) => {
-    const remain = remainGroup(rev, brandGroup(item.name), snap);
+  const fruitGone = soldGramsForGroup("fruit", snap);
+  const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
+  $("#revisionRows").innerHTML = groups.map((group) => {
+    const rows = rev.items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => itemGroup(item) === group.id);
+    const remain = remainGroup(rev, group.id, snap);
+    const fruitHint = group.id === "fruit" && fruitGone
+      ? ` · списано на фрукте ${formatGrams(fruitGone)} г`
+      : "";
+    const list = rows.length
+      ? rows.map(({ item, index }) => {
+        const income = incomeForItem(rev, item, snap);
+        const now = Number(item.grams || 0) + income;
+        return `
+          <label class="sheet-row group-${group.id}">
+            <span>${escapeHtml(item.name)} <small>приход ${formatGrams(income)} г · в этом месяце ${formatGrams(now)} г</small></span>
+            <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
+          </label>
+        `;
+      }).join("")
+      : `<p class="rev-empty">Марок пока нет — добавь ниже</p>`;
     return `
-    <label class="sheet-row group-${brandGroup(item.name)}">
-      <span>${escapeHtml(item.name)} <small>сейчас ${formatGrams(remain)} г</small></span>
-      <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
-    </label>
-  `;
+      <section class="rev-block group-${group.id}">
+        <h3>${escapeHtml(group.title)} <small>сейчас ${formatGrams(remain)} г${fruitHint}</small></h3>
+        <p class="rev-note">${escapeHtml(group.note)}</p>
+        ${list}
+        <div class="sheet-row total">
+          <span>На снятии · ${escapeHtml(group.title)}</span>
+          <strong>${formatGrams(snapshotGramsForGroup(rev, group.id))}</strong>
+        </div>
+      </section>
+    `;
   }).join("");
 
   const saleGroups = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
@@ -1858,7 +2001,7 @@ function syncIncomeForm() {
 }
 
 function addTobaccoIncome({ date, group, product, qty, sum, supplier, note }) {
-  const groupId = SALE_GROUPS.some((item) => item.id === group) ? group : brandGroup(product);
+  const groupId = REVISION_GROUPS.some((item) => item.id === group) ? group : brandGroup(product);
   const name = (product || "").trim() || groupTitle(groupId);
   state.tobacco.push({
     id: uid(),
@@ -1880,13 +2023,13 @@ function renderIncomeGroups() {
     box.innerHTML = "";
     return;
   }
-  box.innerHTML = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers").map((group) => {
+  box.innerHTML = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers").map((group, index) => {
     const grams = incomingRows()
       .filter((row) => rowGroup(row) === group.id)
       .reduce((sum, row) => sum + Number(row.qty || 0), 0);
     return `
       <button type="button" class="sale-btn group-${group.id}" data-income-group="${group.id}">
-        <strong>${group.num}. ${group.title}</strong>
+        <strong>${index + 1}. ${group.title}</strong>
         <span>${group.note}</span>
         <b>${formatGrams(grams)} г</b>
         <em>нажми, чтобы добавить приход</em>
@@ -1905,11 +2048,11 @@ function renderTobacco() {
   renderIncomeGroups();
 
   if (incomingKind === "tobacco") {
-    $("#tobaccoStats").innerHTML = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers").map((group) => {
+    $("#tobaccoStats").innerHTML = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers").map((group, index) => {
       const grams = rows
         .filter((row) => rowGroup(row) === group.id)
         .reduce((total, row) => total + Number(row.qty || 0), 0);
-      return `<div class="stat group-${group.id}"><span>${group.num}. ${group.title}</span><b>${formatGrams(grams)} г</b></div>`;
+      return `<div class="stat group-${group.id}"><span>${index + 1}. ${group.title}</span><b>${formatGrams(grams)} г</b></div>`;
     }).join("") + `
       <div class="stat"><span>Всего</span><b>${formatGrams(qty)} г</b></div>
       <div class="stat"><span>Сумма</span><b>${formatSum(sum)}</b></div>
@@ -2229,7 +2372,31 @@ $("#addEmployeeForm").addEventListener("submit", (e) => {
   renderShifts();
 });
 
+$("#prevRevMonth")?.addEventListener("click", () => {
+  viewRevMonth = new Date(viewRevMonth.getFullYear(), viewRevMonth.getMonth() - 1, 1);
+  const dateInput = $("#revisionDate");
+  if (dateInput) dateInput.value = lastDayOfMonthISO(toISODate(viewRevMonth));
+  renderRevision();
+});
+
+$("#nextRevMonth")?.addEventListener("click", () => {
+  viewRevMonth = new Date(viewRevMonth.getFullYear(), viewRevMonth.getMonth() + 1, 1);
+  const dateInput = $("#revisionDate");
+  if (dateInput) {
+    const today = todayISO();
+    dateInput.value = monthKey(viewRevMonth) === monthKey(new Date())
+      ? today
+      : lastDayOfMonthISO(toISODate(viewRevMonth));
+  }
+  renderRevision();
+});
+
 $("#revisionDate").addEventListener("change", () => {
+  const iso = $("#revisionDate").value;
+  if (iso) {
+    const date = parseISODate(iso);
+    viewRevMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  }
   renderRevision();
 });
 
@@ -2263,16 +2430,19 @@ $("#coalsInput").addEventListener("input", (e) => {
 
 $("#addBrandForm").addEventListener("submit", (e) => {
   e.preventDefault();
-  const name = new FormData(e.target).get("name").trim();
+  const data = Object.fromEntries(new FormData(e.target));
+  const name = (data.name || "").trim();
   if (!name) return;
   const rev = shownRevision();
   if (!rev) return;
+  const group = REVISION_GROUPS.some((item) => item.id === data.group) ? data.group : brandGroup(name);
   if (!rev.items.some((item) => item.name.toLowerCase() === name.toLowerCase())) {
-    rev.items.push({ name, grams: 0 });
+    rev.items.push({ name, grams: 0, group });
     save();
     renderRevision();
   }
   e.target.reset();
+  if (e.target.group) e.target.group.value = group;
 });
 
 $("#saleForm").addEventListener("submit", (e) => e.preventDefault());
@@ -2710,25 +2880,9 @@ $("#addChecklistItemForm").addEventListener("submit", (e) => {
 });
 
 $("#snapshotBtn")?.addEventListener("click", () => {
-  const date = $("#revisionDate").value || OPENING_DATE;
-  const prev = shownRevision();
-  if (!prev) return;
-  if ((state.revisions || []).some((row) => row.date === date && !isEmptyRevision(row))) {
-    window.alert("На эту дату снятие уже есть. Поставь другую дату.");
-    return;
-  }
-  const items = SALE_GROUPS
-    .filter((group) => db.current !== "shishka" || group.id !== "tangiers")
-    .map((group) => ({
-      name: group.title,
-      grams: Math.max(0, remainGroup(prev, group.id, prev.date)),
-    }));
-  state.revisions = (state.revisions || []).filter((row) => row.date !== date);
-  state.revisions.push({
-    date,
-    coals: Math.max(0, remainCoals(prev, prev.date)),
-    items,
-  });
+  const rev = shownRevision();
+  if (!rev) return;
+  rev.date = clampDateToMonth($("#revisionDate").value || toISODate(viewRevMonth), toISODate(viewRevMonth));
   save();
   renderRevision();
 });
@@ -2806,9 +2960,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "52") {
+  if (localStorage.getItem("journal-sw") !== "53") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "52");
+    localStorage.setItem("journal-sw", "53");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();

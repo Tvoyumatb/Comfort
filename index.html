@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=53">
 </head>
 <body>
   <header class="topbar no-print">
@@ -102,15 +102,29 @@
     </section>
 
     <section id="revision" class="panel" role="tabpanel" hidden>
+      <div class="period-bar">
+        <button type="button" class="icon-btn" id="prevRevMonth" aria-label="Предыдущий месяц">‹</button>
+        <div class="period-label">
+          <strong id="revMonthLabel">—</strong>
+          <span>Остаток, приход и списание считаются только внутри этого месяца</span>
+        </div>
+        <button type="button" class="icon-btn" id="nextRevMonth" aria-label="Следующий месяц">›</button>
+      </div>
       <div class="card sheet">
-        <label class="sheet-date">Число снятия
+        <label class="sheet-date">Дата снятия в этом месяце
           <span class="date-wrap">
             <input type="date" id="revisionDate">
           </span>
         </label>
-        <div class="sheet-caption">Название табака — в граммах</div>
+        <div class="sheet-caption">Каждый табак отдельно — граммы остатка на снятии</div>
         <div id="revisionRows"></div>
-        <form class="add-brand" id="addBrandForm">
+        <form class="add-brand add-brand-rev" id="addBrandForm">
+          <select name="group" aria-label="Тип">
+            <option value="classic">Классик</option>
+            <option value="premium">Премиум</option>
+            <option value="fruit">Фрукт</option>
+            <option value="tangiers">Tangiers</option>
+          </select>
           <input type="text" name="name" placeholder="Добавить марку" required>
           <button type="submit" class="primary compact">+</button>
         </form>
@@ -136,7 +150,8 @@
           <strong id="coalsRemain">0 шт</strong>
         </div>
         <p class="hint warn" id="coalsWarn" hidden>Угли на снятии 0. Добавь название угля и штуки, либо пачки во вкладке Приход → Уголь.</p>
-        <button type="button" class="ghost" id="snapshotBtn">Зафиксировать снятие на выбранную дату</button>
+        <p class="hint">Прошлый месяц сюда не входит. Новый месяц начинай с нового остатка по каждой марке.</p>
+        <button type="button" class="ghost" id="snapshotBtn">Сохранить остаток за этот месяц</button>
       </div>
       <p class="hint">Позиция 25 г / 5 углей. Фрукт 40 г / 7 углей с классика, премиума или Tangiers. Недосдачу списывай с той группы, где нехватка — как шеф или фрукт.</p>
 
@@ -291,7 +306,7 @@
           <input type="text" name="note" placeholder="Номер документа">
         </label>
         <div id="tobaccoGroupWrap">
-          <p class="hint">Граммы + кнопка группы: 1 Классик, 2 Премиум, 3 Tangiers</p>
+          <p class="hint">Граммы + кнопка группы: Классик, Премиум, Фрукт, Tangiers</p>
           <div class="sale-btns" id="incomeGroupButtons"></div>
         </div>
         <button type="submit" class="primary" id="tobaccoSubmit">Записать приход</button>
@@ -363,6 +378,6 @@
     <article class="report-paper" id="reportPaper"></article>
   </div>
 
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>
