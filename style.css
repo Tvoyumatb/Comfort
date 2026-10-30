@@ -39,6 +39,13 @@ html, body {
   background: #070707;
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -130,6 +137,7 @@ body[data-venue="shishka"]::before {
   margin: 4px 0 0;
   color: var(--muted);
   font-size: 12px;
+  cursor: pointer;
 }
 
 h1 {
@@ -381,6 +389,8 @@ select {
   color: var(--text);
   font: inherit;
   font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .date-wrap {
@@ -414,7 +424,7 @@ label {
   font-size: 13px;
 }
 
-input {
+input, textarea {
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -426,6 +436,8 @@ input {
   color: var(--text);
   font: inherit;
   font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 input[type="date"],

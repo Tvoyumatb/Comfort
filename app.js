@@ -1,6 +1,7 @@
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
-const CLOUD_URL = "https://crudcrud.com/api/d49d4e06e88b46bb9924b8f74c888f34/journal/6ae4d8890e887f03e8536ec3";
+const CLOUD_BASE = "https://crudcrud.com/api/110ce53c0d0e41e2bbade7b51a33f4bf/journal";
+const CLOUD_URL = `${CLOUD_BASE}/6ae4dd404b7cf403e88e95c5`;
 const CLOUD_FALLBACK = "./journal-cloud.json";
 
 const VENUES = {
@@ -590,32 +591,68 @@ function save() {
 let cloudReady = false;
 let cloudApplying = false;
 let cloudTimer = 0;
+let cloudPoll = 0;
 
 function queueCloudPush() {
-  if (!cloudReady || cloudApplying) return;
+  if (cloudApplying) return;
   window.clearTimeout(cloudTimer);
   cloudTimer = window.setTimeout(() => {
+    if (!cloudReady) {
+      queueCloudPush();
+      return;
+    }
     pushCloud().catch(() => {});
-  }, 800);
+  }, 400);
+}
+
+async function fetchWithTimeout(url, opts = {}, ms = 12000) {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { cache: "no-store", ...opts, signal: ctrl.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function asJournal(raw) {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    const rows = raw.filter((row) => row && (!row.app || row.app === "comfort-journal"));
+    rows.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    raw = rows[0];
+  }
+  if (!raw || (raw.app && raw.app !== "comfort-journal")) return null;
+  return raw;
 }
 
 async function fetchCloud() {
-  const res = await fetch(CLOUD_URL, { cache: "no-store" });
-  if (res.ok) return res.json();
-  const fallback = await fetch(`${CLOUD_FALLBACK}?t=${Date.now()}`, { cache: "no-store" });
-  if (fallback.ok) return fallback.json();
+  const item = await fetchWithTimeout(CLOUD_URL);
+  if (item.ok) return asJournal(await item.json());
+  const list = await fetchWithTimeout(CLOUD_BASE);
+  if (list.ok) return asJournal(await list.json());
+  const fallback = await fetchWithTimeout(`${CLOUD_FALLBACK}?t=${Date.now()}`);
+  if (fallback.ok) return asJournal(await fallback.json());
   throw new Error("cloud");
 }
 
 async function pullCloud() {
   try {
-    const raw = await fetchCloud();
-    if (!raw) return null;
-    if (raw.app && raw.app !== "comfort-journal") return null;
-    return raw;
+    return await fetchCloud();
   } catch {
     return null;
   }
+}
+
+function applyRemote(remote, status) {
+  cloudApplying = true;
+  applyCloud(remote);
+  saveLocal();
+  syncVenueUi();
+  setTodayDefaults();
+  render();
+  cloudApplying = false;
+  setSyncStatus(status);
 }
 
 async function pushCloud() {
@@ -623,7 +660,7 @@ async function pushCloud() {
   const body = JSON.stringify(packedDb());
   setSyncStatus("Сохраняю…");
   try {
-    const res = await fetch(CLOUD_URL, {
+    const res = await fetchWithTimeout(CLOUD_URL, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body,
@@ -631,25 +668,21 @@ async function pushCloud() {
     if (!res.ok) throw new Error("push");
     setSyncStatus("Сохранено на телефон и ноут");
   } catch {
-    setSyncStatus("Нет сети — пока только на этом устройстве");
+    setSyncStatus("Не удалось сохранить в облако — нажми сюда ещё раз");
   }
 }
 
-async function refreshCloud() {
+async function refreshCloud(force = false) {
   if (!cloudReady || cloudApplying) return;
   const active = document.activeElement;
-  if (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
+  if (!force && active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
   const remote = await pullCloud();
-  if (!remote) return;
+  if (!remote) {
+    setSyncStatus("Нет сети — данные пока только на этом устройстве");
+    return;
+  }
   if (shouldUseRemote(remote, db)) {
-    cloudApplying = true;
-    applyCloud(remote);
-    saveLocal();
-    syncVenueUi();
-    setTodayDefaults();
-    render();
-    cloudApplying = false;
-    setSyncStatus("Подтянул свежие данные");
+    applyRemote(remote, "Подтянул свежие данные");
   }
 }
 
@@ -659,24 +692,29 @@ async function bootCloud() {
   const remote = await pullCloud();
   cloudReady = true;
   if (shouldUseRemote(remote, db)) {
-    cloudApplying = true;
-    applyCloud(remote);
-    saveLocal();
-    syncVenueUi();
-    setTodayDefaults();
-    render();
-    cloudApplying = false;
-    setSyncStatus("Данные с телефона и ноута");
+    applyRemote(remote, "Данные с телефона и ноута");
   } else if (dbFill(db) > dbFill(remote)) {
     await pushCloud();
-  } else {
+  } else if (remote) {
     setSyncStatus("Данные с телефона и ноута");
+  } else {
+    setSyncStatus("Нет сети — данные пока только на этом устройстве");
   }
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") refreshCloud();
   });
-  window.addEventListener("online", () => refreshCloud());
+  window.addEventListener("online", () => refreshCloud(true));
   window.addEventListener("focus", () => refreshCloud());
+  window.clearInterval(cloudPoll);
+  cloudPoll = window.setInterval(() => {
+    if (document.visibilityState === "visible") refreshCloud();
+  }, 8000);
+  $("#syncStatus")?.addEventListener("click", () => {
+    setSyncStatus("Обновляю…");
+    refreshCloud(true).then(() => {
+      if (dbFill(db) > 0) pushCloud().catch(() => {});
+    });
+  });
 }
 
 function venueName() {
@@ -2650,8 +2688,27 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").catch(() => {});
+  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
+    reg.update();
+  }).catch(() => {});
 }
+
+["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
+  document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
+});
+
+let lastTapAt = 0;
+document.addEventListener("touchend", (event) => {
+  if (event.target.closest("input, textarea, select, button, a")) {
+    lastTapAt = Date.now();
+    return;
+  }
+  const now = Date.now();
+  if (now - lastTapAt < 350) event.preventDefault();
+  lastTapAt = now;
+}, { passive: false });
+
+document.addEventListener("dblclick", (event) => event.preventDefault());
 
 syncVenueUi();
 setTodayDefaults();
