@@ -1843,11 +1843,11 @@ function renderRevision() {
   const snap = rev.date;
   const prev = prevMonthRevision(snap);
   const prevTotal = prev ? revisionTotal(prev) : 0;
-  const usedTotal = prevTotal - revisionTotal(rev);
-  const coalsUsed = usedCoals(rev, snap);
+  const usedTotal = prev ? prevTotal - revisionTotal(rev) : null;
+  const coalsUsed = prev ? usedCoals(rev, snap) : null;
   $("#revisionPrev").textContent = formatGrams(prevTotal);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  $("#revisionUsed").textContent = formatGrams(usedTotal);
+  $("#revisionUsed").textContent = usedTotal == null ? "—" : formatGrams(usedTotal);
   const prevCoals = Number(prev?.coals || 0);
   const nowCoals = Number(rev.coals || 0);
   const coalsPrevEl = $("#coalsPrev");
@@ -1856,8 +1856,8 @@ function renderRevision() {
   if (coalsNowEl) coalsNowEl.textContent = `${formatGrams(nowCoals)} шт`;
   const coalsRemain = $("#coalsRemain");
   if (coalsRemain) {
-    coalsRemain.textContent = `${formatGrams(coalsUsed)} шт`;
-    coalsRemain.classList.toggle("low-stock", coalsUsed > 0);
+    coalsRemain.textContent = coalsUsed == null ? "—" : `${formatGrams(coalsUsed)} шт`;
+    coalsRemain.classList.toggle("low-stock", Number(coalsUsed) > 0);
   }
   const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
   if (!rev.items.length) {
@@ -1870,20 +1870,17 @@ function renderRevision() {
         .map((item, index) => ({ item, index }))
         .filter(({ item }) => itemGroup(item) === group.id);
       if (!rows.length) return "";
-      const used = usedGramsForGroup(rev, group.id, snap);
-      const list = rows.map(({ item, index }) => {
-        const gone = usedGramsForItem(rev, item, snap);
-        return `
+      const used = prev ? usedGramsForGroup(rev, group.id, snap) : null;
+      const list = rows.map(({ item, index }) => `
           <div class="sheet-row rev-item group-${group.id}">
-            <span>${escapeHtml(item.name)} <small>ушло по ревизии ${formatGrams(gone)} г</small></span>
+            <span>${escapeHtml(item.name)}</span>
             <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
             <button type="button" class="danger compact" data-del-brand="${index}" aria-label="Удалить">×</button>
           </div>
-        `;
-      }).join("");
+        `).join("");
       return `
         <section class="rev-block group-${group.id}">
-          <h3>${escapeHtml(group.title)} <small>ушло ${formatGrams(used)} г</small></h3>
+          <h3>${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</h3>
           ${list}
         </section>
       `;
@@ -2363,7 +2360,7 @@ $("#revisionRows").addEventListener("input", (e) => {
   const prevTotal = prev ? revisionTotal(prev) : 0;
   if ($("#revisionPrev")) $("#revisionPrev").textContent = formatGrams(prevTotal);
   if ($("#revisionTotal")) $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  if ($("#revisionUsed")) $("#revisionUsed").textContent = formatGrams(prevTotal - revisionTotal(rev));
+  if ($("#revisionUsed")) $("#revisionUsed").textContent = prev ? formatGrams(prevTotal - revisionTotal(rev)) : "—";
 });
 
 $("#revisionRows").addEventListener("click", (e) => {
@@ -2385,8 +2382,8 @@ $("#coalsInput").addEventListener("input", (e) => {
   if (remainEl) {
     const prev = prevMonthRevision(rev.date);
     const now = usedCoals(rev, rev.date);
-    remainEl.textContent = `${formatGrams(now)} шт`;
-    remainEl.classList.toggle("low-stock", now > 0);
+    remainEl.textContent = prev ? `${formatGrams(now)} шт` : "—";
+    remainEl.classList.toggle("low-stock", Boolean(prev) && now > 0);
     const coalsPrevEl = $("#coalsPrev");
     if (coalsPrevEl) coalsPrevEl.textContent = `${formatGrams(Number(prev?.coals || 0))} шт`;
     const coalsNowEl = $("#coalsNow");
@@ -2945,9 +2942,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "57") {
+  if (localStorage.getItem("journal-sw") !== "58") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "57");
+    localStorage.setItem("journal-sw", "58");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();

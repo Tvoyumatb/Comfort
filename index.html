@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=57">
+  <link rel="stylesheet" href="style.css?v=58">
 </head>
 <body>
   <header class="topbar no-print">
@@ -135,30 +135,29 @@
         </label>
         <div class="sheet-caption">3. Остаток</div>
         <div class="sheet-row total">
-          <span>Остаток табака прошлого месяца</span>
+          <span>Табак, прошлый месяц</span>
           <strong id="revisionPrev">0</strong>
         </div>
         <div class="sheet-row total">
-          <span>Остаток табака на снятии</span>
+          <span>Табак, снятие</span>
           <strong id="revisionTotal">0</strong>
         </div>
         <div class="sheet-row total">
-          <span>Ушло табака по ревизии</span>
-          <strong id="revisionUsed">0</strong>
+          <span>−</span>
+          <strong id="revisionUsed">—</strong>
         </div>
         <div class="sheet-row total">
-          <span>Остаток углей прошлого месяца</span>
+          <span>Угли, прошлый месяц</span>
           <strong id="coalsPrev">0 шт</strong>
         </div>
         <div class="sheet-row total">
-          <span>Остаток углей на снятии</span>
+          <span>Угли, снятие</span>
           <strong id="coalsNow">0 шт</strong>
         </div>
         <div class="sheet-row total">
-          <span>Ушло углей</span>
-          <strong id="coalsRemain">0 шт</strong>
+          <span>−</span>
+          <strong id="coalsRemain">—</strong>
         </div>
-        <p class="hint">Сначала впиши ревизию и угли, снизу сам сложится остаток. Ушло = прошлый остаток − нынешний. Чеки во вкладке Приход сюда не входят.</p>
       </div>
     </section>
 
@@ -286,6 +285,6 @@
     <article class="report-paper" id="reportPaper"></article>
   </div>
 
-  <script src="app.js?v=57"></script>
+  <script src="app.js?v=58"></script>
 </body>
 </html>
