@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=55">
+  <link rel="stylesheet" href="style.css?v=56">
 </head>
 <body>
   <header class="topbar no-print">
@@ -116,7 +116,7 @@
             <input type="date" id="revisionDate">
           </span>
         </label>
-        <div class="sheet-caption">Добавь марку и впиши остаток в граммах</div>
+        <div class="sheet-caption">1. Ревизия табака</div>
         <form class="add-brand add-brand-rev" id="addBrandForm">
           <select name="group" aria-label="Тип">
             <option value="classic">Классик</option>
@@ -128,27 +128,37 @@
           <button type="submit" class="primary compact">+</button>
         </form>
         <div id="revisionRows"></div>
-        <div class="sheet-row total">
-          <span>Остаток прошлого месяца</span>
-          <strong id="revisionPrev">0</strong>
-        </div>
-        <div class="sheet-row total">
-          <span>Остаток на снятии</span>
-          <strong id="revisionTotal">0</strong>
-        </div>
-        <div class="sheet-row total">
-          <span>Ушло по ревизии</span>
-          <strong id="revisionUsed">0</strong>
-        </div>
+        <div class="sheet-caption">2. Остаток углей</div>
         <label class="sheet-row coals" id="coalsInputRow">
           <span>Угли на снятии, шт</span>
           <input type="number" id="coalsInput" min="0" step="1" inputmode="numeric">
         </label>
+        <div class="sheet-caption">3. Остаток</div>
         <div class="sheet-row total">
-          <span>Ушло углей за месяц</span>
+          <span>Остаток табака прошлого месяца</span>
+          <strong id="revisionPrev">0</strong>
+        </div>
+        <div class="sheet-row total">
+          <span>Остаток табака на снятии</span>
+          <strong id="revisionTotal">0</strong>
+        </div>
+        <div class="sheet-row total">
+          <span>Ушло табака по ревизии</span>
+          <strong id="revisionUsed">0</strong>
+        </div>
+        <div class="sheet-row total">
+          <span>Остаток углей прошлого месяца</span>
+          <strong id="coalsPrev">0 шт</strong>
+        </div>
+        <div class="sheet-row total">
+          <span>Остаток углей на снятии</span>
+          <strong id="coalsNow">0 шт</strong>
+        </div>
+        <div class="sheet-row total">
+          <span>Ушло углей</span>
           <strong id="coalsRemain">0 шт</strong>
         </div>
-        <p class="hint">Ушло по ревизии = прошлый остаток − нынешний. Приход по чекам сюда не входит — его смотри отдельно во вкладке Приход, даже если какие-то накладные забыл.</p>
+        <p class="hint">Сначала впиши ревизию и угли, снизу сам сложится остаток. Ушло = прошлый остаток − нынешний. Чеки во вкладке Приход сюда не входят.</p>
       </div>
     </section>
 
@@ -276,6 +286,6 @@
     <article class="report-paper" id="reportPaper"></article>
   </div>
 
-  <script src="app.js?v=55"></script>
+  <script src="app.js?v=56"></script>
 </body>
 </html>

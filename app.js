@@ -1818,6 +1818,12 @@ function renderRevision() {
   $("#revisionPrev").textContent = formatGrams(prevTotal);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
   $("#revisionUsed").textContent = formatGrams(usedTotal);
+  const prevCoals = Number(prev?.coals || 0);
+  const nowCoals = Number(rev.coals || 0);
+  const coalsPrevEl = $("#coalsPrev");
+  if (coalsPrevEl) coalsPrevEl.textContent = `${formatGrams(prevCoals)} шт`;
+  const coalsNowEl = $("#coalsNow");
+  if (coalsNowEl) coalsNowEl.textContent = `${formatGrams(nowCoals)} шт`;
   const coalsRemain = $("#coalsRemain");
   if (coalsRemain) {
     coalsRemain.textContent = `${formatGrams(coalsUsed)} шт`;
@@ -2347,9 +2353,14 @@ $("#coalsInput").addEventListener("input", (e) => {
   save();
   const remainEl = $("#coalsRemain");
   if (remainEl) {
+    const prev = prevMonthRevision(rev.date);
     const now = usedCoals(rev, rev.date);
     remainEl.textContent = `${formatGrams(now)} шт`;
     remainEl.classList.toggle("low-stock", now > 0);
+    const coalsPrevEl = $("#coalsPrev");
+    if (coalsPrevEl) coalsPrevEl.textContent = `${formatGrams(Number(prev?.coals || 0))} шт`;
+    const coalsNowEl = $("#coalsNow");
+    if (coalsNowEl) coalsNowEl.textContent = `${formatGrams(Number(rev.coals || 0))} шт`;
   }
   const coalsWarn = $("#coalsWarn");
   if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || remainCoals(rev, rev.date) > 0;
@@ -2904,9 +2915,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "55") {
+  if (localStorage.getItem("journal-sw") !== "56") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "55");
+    localStorage.setItem("journal-sw", "56");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();
