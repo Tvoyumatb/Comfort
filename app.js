@@ -98,7 +98,7 @@ const MONTHS_RU = [
 const INCOME = {
   tobacco: {
     title: "Приход табака",
-    hint: "Жмите Классик, Премиум или Tangiers — граммы уйдут в ту же группу, что и продажи",
+    hint: "Выбери тип табака, укажи граммы и нажми «Записать приход»",
     name: "Марка",
     placeholder: "Например Starline",
     qty: "Граммы",
@@ -213,9 +213,7 @@ function emptyOpening(venueId) {
   return {
     date: OPENING_DATE,
     coals: 0,
-    items: SALE_GROUPS
-      .filter((group) => venueId !== "shishka" || group.id !== "tangiers")
-      .map((group) => ({ name: group.title, grams: 0 })),
+    items: [],
   };
 }
 
@@ -1388,10 +1386,6 @@ function defaultBrandItems(venueId = db.current) {
 
 function fillRevisionBrands(rev) {
   if (!rev.items) rev.items = [];
-  const have = new Set(rev.items.map((item) => normalizeName(item.name)));
-  defaultBrandItems().forEach((item) => {
-    if (!have.has(normalizeName(item.name))) rev.items.push({ ...item });
-  });
   rev.items.forEach((item) => {
     if (!item.group) item.group = brandGroup(item.name);
   });
@@ -1408,15 +1402,10 @@ function ensureRevision(date) {
   const iso = date || toISODate(viewRevMonth);
   let rev = revisionForMonth(iso);
   if (!rev) {
-    const extra = [...new Set((state.revisions || []).flatMap((row) => (row.items || []).map((item) => item.name)))]
-      .filter((name) => !DEFAULT_BRANDS.includes(name) && name !== "Tangiers" && !isGroupTitleName(name));
     rev = {
       date: clampDateToMonth(iso, iso),
       coals: 0,
-      items: [
-        ...defaultBrandItems(),
-        ...extra.map((name) => ({ name, grams: 0, group: brandGroup(name) })),
-      ],
+      items: [],
     };
     state.revisions.push(rev);
     save();
@@ -1424,6 +1413,30 @@ function ensureRevision(date) {
     fillRevisionBrands(rev);
   }
   return rev;
+}
+
+function prevMonthRevision(fromDate) {
+  const date = parseISODate(fromDate);
+  return revisionForMonth(toISODate(new Date(date.getFullYear(), date.getMonth() - 1, 1)));
+}
+
+function usedGramsForGroup(rev, groupId, fromDate) {
+  const prev = prevMonthRevision(fromDate);
+  const before = prev ? snapshotGramsForGroup(prev, groupId) : 0;
+  return before + incomeGramsForGroup(groupId, fromDate) - snapshotGramsForGroup(rev, groupId);
+}
+
+function usedGramsForItem(rev, item, fromDate) {
+  const prev = prevMonthRevision(fromDate);
+  const prevItem = (prev?.items || []).find((row) =>
+    itemGroup(row) === itemGroup(item) && normalizeName(row.name) === normalizeName(item.name)
+  );
+  return Number(prevItem?.grams || 0) + incomeForItem(rev, item, fromDate) - Number(item.grams || 0);
+}
+
+function usedCoals(rev, fromDate) {
+  const prev = prevMonthRevision(fromDate);
+  return Number(prev?.coals || 0) + incomeCoals(fromDate) - Number(rev.coals || 0);
 }
 
 function revisionTotal(rev) {
@@ -1789,154 +1802,60 @@ function renderRevision() {
   }
   const tangiersBrandOpt = document.querySelector('#addBrandForm [name="group"] option[value="tangiers"]');
   if (tangiersBrandOpt) tangiersBrandOpt.hidden = db.current === "shishka";
-  const coalKinds = ensureCoalStock();
-  const coalKindRows = $("#coalKindRows");
-  if (coalKindRows) {
-    coalKindRows.innerHTML = coalKinds.map((item) => `
-      <label class="sheet-row coals coal-kind">
-        <span>${escapeHtml(item.name)} <small>сейчас ${formatGrams(coalNow(item))} шт</small></span>
-        <input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" data-coal-start="${item.id}">
-      </label>
-    `).join("");
-  }
-  const coalsInputRow = $("#coalsInputRow");
-  if (coalsInputRow) coalsInputRow.hidden = coalKinds.length > 0;
-  if (coalKinds.length) syncOpeningCoals();
+  const tangiersIncomeOpt = document.querySelector('#incomeGroupSelect option[value="tangiers"]');
+  if (tangiersIncomeOpt) tangiersIncomeOpt.hidden = db.current === "shishka";
   $("#coalsInput").value = rev.coals || 0;
   if (!Array.isArray(state.hookahSales)) state.hookahSales = [];
-  const gramsInput = $("#gramsPerHookah");
-  if (gramsInput && document.activeElement !== gramsInput) {
-    gramsInput.value = gramsPerHookah();
-  }
-  const coalsUseInput = $("#coalsPerHookah");
-  if (coalsUseInput && document.activeElement !== coalsUseInput) {
-    coalsUseInput.value = coalsPerHookah();
-  }
-  const staffInput = $("#staffPerDay");
-  if (staffInput && document.activeElement !== staffInput) {
-    staffInput.value = staffPerDay();
-  }
-  const tangiersMonth = $("#monthTangiersWrap");
-  if (tangiersMonth) tangiersMonth.hidden = db.current === "shishka";
-  const fruitTangiers = $("#monthFruitTangiersWrap");
-  if (fruitTangiers) fruitTangiers.hidden = db.current === "shishka";
-  const shortTangiers = document.querySelector('#monthSaleForm [name="shortGroup"] option[value="tangiers"]');
-  if (shortTangiers) shortTangiers.hidden = db.current === "shishka";
   const packInput = document.querySelector('#coalForm [name="perPack"]');
   if (packInput && document.activeElement !== packInput) {
     packInput.value = coalsPerPack();
   }
   const snap = rev.date;
-  const remainTotal = SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, snap), 0);
-  const coalsNow = remainCoals(rev, snap);
+  const prev = prevMonthRevision(snap);
+  const prevTotal = prev ? revisionTotal(prev) : 0;
+  const incomeTotal = REVISION_GROUPS.reduce((sum, group) => sum + incomeGramsForGroup(group.id, snap), 0);
+  const usedTotal = prevTotal + incomeTotal - revisionTotal(rev);
+  const coalsUsed = usedCoals(rev, snap);
+  $("#revisionPrev").textContent = formatGrams(prevTotal);
+  $("#revisionIncome").textContent = formatGrams(incomeTotal);
   $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  $("#revisionRemain").textContent = formatGrams(remainTotal);
-  const shortageEl = $("#shortageTotal");
-  if (shortageEl) {
-    const shortGrams = shortageGramsInWindow(snap);
-    shortageEl.textContent = formatGrams(shortGrams);
-    const shortageRow = shortageEl.closest(".sheet-row");
-    if (shortageRow) shortageRow.hidden = shortGrams <= 0;
-  }
+  $("#revisionUsed").textContent = formatGrams(usedTotal);
   const coalsRemain = $("#coalsRemain");
   if (coalsRemain) {
-    coalsRemain.textContent = `${formatGrams(coalsNow)} шт`;
-    coalsRemain.classList.toggle("low-stock", coalsNow <= 0);
+    coalsRemain.textContent = `${formatGrams(coalsUsed)} шт`;
+    coalsRemain.classList.toggle("low-stock", coalsUsed > 0);
   }
-  const coalsWarn = $("#coalsWarn");
-  if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || coalsNow > 0;
-  const fruitGone = soldGramsForGroup("fruit", snap);
   const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
-  $("#revisionRows").innerHTML = groups.map((group) => {
-    const rows = rev.items
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => itemGroup(item) === group.id);
-    const remain = remainGroup(rev, group.id, snap);
-    const fruitHint = group.id === "fruit" && fruitGone
-      ? ` · списано на фрукте ${formatGrams(fruitGone)} г`
-      : "";
-    const list = rows.length
-      ? rows.map(({ item, index }) => {
+  if (!rev.items.length) {
+    $("#revisionRows").innerHTML = `<p class="rev-empty">Список пустой. Добавь марку сам: тип + название + граммы остатка.</p>`;
+    return;
+  }
+  $("#revisionRows").innerHTML = groups
+    .map((group) => {
+      const rows = rev.items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => itemGroup(item) === group.id);
+      if (!rows.length) return "";
+      const used = usedGramsForGroup(rev, group.id, snap);
+      const list = rows.map(({ item, index }) => {
         const income = incomeForItem(rev, item, snap);
-        const now = Number(item.grams || 0) + income;
+        const gone = usedGramsForItem(rev, item, snap);
         return `
-          <label class="sheet-row group-${group.id}">
-            <span>${escapeHtml(item.name)} <small>приход ${formatGrams(income)} г · в этом месяце ${formatGrams(now)} г</small></span>
+          <div class="sheet-row rev-item group-${group.id}">
+            <span>${escapeHtml(item.name)} <small>приход ${formatGrams(income)} г · ушло ${formatGrams(gone)} г</small></span>
             <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
-          </label>
+            <button type="button" class="danger compact" data-del-brand="${index}" aria-label="Удалить">×</button>
+          </div>
         `;
-      }).join("")
-      : `<p class="rev-empty">Марок пока нет — добавь ниже</p>`;
-    return `
-      <section class="rev-block group-${group.id}">
-        <h3>${escapeHtml(group.title)} <small>сейчас ${formatGrams(remain)} г${fruitHint}</small></h3>
-        <p class="rev-note">${escapeHtml(group.note)}</p>
-        ${list}
-        <div class="sheet-row total">
-          <span>На снятии · ${escapeHtml(group.title)}</span>
-          <strong>${formatGrams(snapshotGramsForGroup(rev, group.id))}</strong>
-        </div>
-      </section>
-    `;
-  }).join("");
-
-  const saleGroups = SALE_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
-  $("#saleButtons").innerHTML = saleGroups.map((group) => {
-    const remain = remainGroup(rev, group.id, snap);
-    const sold = soldHookahsForGroup(group.id, snap);
-    return `
-      <button type="button" class="sale-btn group-${group.id}" data-sale-group="${group.id}">
-        <strong>${group.num}. ${group.title}</strong>
-        <span>${group.note} · ${gramsPerHookah()} г / ${coalsPerHookah()} угля</span>
-        <b class="${remain <= 0 ? "low-stock" : ""}">${formatGrams(remain)} г</b>
-        <em>списано ${sold} кальянов</em>
-      </button>
-    `;
-  }).join("") + saleGroups.map((group) => {
-    const remain = remainGroup(rev, group.id, snap);
-    return `
-      <button type="button" class="sale-btn group-${group.id} group-fruit" data-sale-fruit="${group.id}">
-        <strong>Фрукт · ${group.title}</strong>
-        <span>${FRUIT_GRAMS} г / ${FRUIT_COALS} угля с ${group.title}</span>
-        <b class="${remain <= 0 ? "low-stock" : ""}">${formatGrams(remain)} г</b>
-        <em>на фрукте</em>
-      </button>
-    `;
-  }).join("");
-
-  const staffDays = daysOpenInWindow(snap);
-  const staffHookahs = staffHookahsInWindow(snap);
-  const staffBox = $("#staffBox");
-  if (staffBox) {
-    const staffOnly = db.current === "tangiers";
-    staffBox.hidden = !staffOnly || staffPerDay() <= 0;
-    staffBox.innerHTML = staffOnly ? `
-      <h2>Стафф кальяны</h2>
-      <p class="hint">Только Tangiers. Стафф в реальном времени: сегодня ${new Date().getDate()} число — за ${staffDays} дн. этого месяца × ${staffPerDay()} классик = ${staffHookahs} кальянов (−${formatGrams(staffHookahs * gramsPerHookah())} г и −${formatGrams(staffHookahs * coalsPerHookah())} шт угля).</p>
-    ` : "";
-  }
-  const staffInputWrap = $("#staffPerDay")?.closest("label");
-  if (staffInputWrap) staffInputWrap.hidden = db.current !== "tangiers";
-
-  const sales = [...state.hookahSales]
-    .filter((sale) => inRevisionWindow(sale.date, snap))
-    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-  const shortages = sales.filter((sale) => sale.kind === "shortage");
-  const rest = sales.filter((sale) => sale.kind !== "shortage");
-  const shortageList = $("#shortageList");
-  if (shortageList) {
-    shortageList.innerHTML = shortages.length
-      ? `<h2 class="list-heading">Недосдача</h2>${shortages.map(saleCard).join("")}`
-      : "";
-  }
-  if (!rest.length) {
-    $("#salesList").innerHTML = shortages.length
-      ? ""
-      : `<p class="empty">Раз в месяц скинь кальяны, фрукт и недосдачу — с классика, премиума или Tangiers.</p>`;
-  } else {
-    $("#salesList").innerHTML = (shortages.length ? `<h2 class="list-heading">Ушло за месяц</h2>` : "")
-      + rest.map(saleCard).join("");
-  }
+      }).join("");
+      return `
+        <section class="rev-block group-${group.id}">
+          <h3>${escapeHtml(group.title)} <small>ушло ${formatGrams(used)} г</small></h3>
+          ${list}
+        </section>
+      `;
+    })
+    .join("");
 }
 
 function incomingRows() {
@@ -1968,7 +1887,7 @@ function syncIncomeForm() {
   const groupWrap = $("#tobaccoGroupWrap");
   if (groupWrap) groupWrap.hidden = incomingKind !== "tobacco";
   const submit = $("#tobaccoSubmit");
-  if (submit) submit.hidden = incomingKind !== "inventory";
+  if (submit) submit.hidden = isCoal;
   const tobaccoForm = $("#tobaccoForm");
   if (tobaccoForm) tobaccoForm.hidden = isCoal;
   const coalForm = $("#coalForm");
@@ -2067,7 +1986,7 @@ function renderTobacco() {
   }
 
   if (!rows.length) {
-    $("#tobaccoList").innerHTML = `<p class="empty">${incomingKind === "tobacco" ? "Укажи граммы и нажми Классик, Премиум или Tangiers" : meta.empty}</p>`;
+    $("#tobaccoList").innerHTML = `<p class="empty">${incomingKind === "tobacco" ? "Выбери тип, укажи граммы и нажми «Записать приход»" : meta.empty}</p>`;
   } else {
     $("#tobaccoList").innerHTML = rows.map((t) => {
       const title = incomingKind === "tobacco"
@@ -2407,10 +2326,23 @@ $("#revisionRows").addEventListener("input", (e) => {
   if (!rev?.items[Number(index)]) return;
   rev.items[Number(index)].grams = Number(e.target.value || 0);
   save();
-  $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  $("#revisionRemain").textContent = formatGrams(
-    SALE_GROUPS.reduce((sum, group) => sum + remainGroup(rev, group.id, rev.date), 0)
-  );
+  const prev = prevMonthRevision(rev.date);
+  const prevTotal = prev ? revisionTotal(prev) : 0;
+  const incomeTotal = REVISION_GROUPS.reduce((sum, group) => sum + incomeGramsForGroup(group.id, rev.date), 0);
+  if ($("#revisionPrev")) $("#revisionPrev").textContent = formatGrams(prevTotal);
+  if ($("#revisionIncome")) $("#revisionIncome").textContent = formatGrams(incomeTotal);
+  if ($("#revisionTotal")) $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
+  if ($("#revisionUsed")) $("#revisionUsed").textContent = formatGrams(prevTotal + incomeTotal - revisionTotal(rev));
+});
+
+$("#revisionRows").addEventListener("click", (e) => {
+  const del = e.target.dataset.delBrand;
+  if (del == null) return;
+  const rev = shownRevision();
+  if (!rev) return;
+  rev.items.splice(Number(del), 1);
+  save();
+  renderRevision();
 });
 
 $("#coalsInput").addEventListener("input", (e) => {
@@ -2420,9 +2352,9 @@ $("#coalsInput").addEventListener("input", (e) => {
   save();
   const remainEl = $("#coalsRemain");
   if (remainEl) {
-    const now = remainCoals(rev, rev.date);
+    const now = usedCoals(rev, rev.date);
     remainEl.textContent = `${formatGrams(now)} шт`;
-    remainEl.classList.toggle("low-stock", now <= 0);
+    remainEl.classList.toggle("low-stock", now > 0);
   }
   const coalsWarn = $("#coalsWarn");
   if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || remainCoals(rev, rev.date) > 0;
@@ -2445,15 +2377,15 @@ $("#addBrandForm").addEventListener("submit", (e) => {
   if (e.target.group) e.target.group.value = group;
 });
 
-$("#saleForm").addEventListener("submit", (e) => e.preventDefault());
+$("#saleForm")?.addEventListener("submit", (e) => e.preventDefault());
 
-$("#gramsPerHookah").addEventListener("input", (e) => {
+$("#gramsPerHookah")?.addEventListener("input", (e) => {
   state.gramsPerHookah = Math.max(1, Number(e.target.value || DEFAULT_GRAMS_PER_HOOKAH));
   save();
   renderRevision();
 });
 
-$("#coalsPerHookah").addEventListener("input", (e) => {
+$("#coalsPerHookah")?.addEventListener("input", (e) => {
   state.coalsPerHookah = Math.max(0, Number(e.target.value || DEFAULT_COALS_PER_HOOKAH));
   save();
   renderRevision();
@@ -2518,7 +2450,7 @@ function closeSaleConfirm() {
   if (modal) modal.hidden = true;
 }
 
-$("#saleButtons").addEventListener("click", (e) => {
+$("#saleButtons")?.addEventListener("click", (e) => {
   const fruitBtn = e.target.closest("[data-sale-fruit]");
   const btn = e.target.closest("[data-sale-group]");
   const hookahs = Number(document.querySelector('#saleForm [name="hookahs"]')?.value || 1);
@@ -2669,7 +2601,7 @@ $("#stockProductSelect")?.addEventListener("change", () => {
     : INCOME.inventory.qty;
 });
 
-$("#incomeGroupButtons").addEventListener("click", (e) => {
+$("#incomeGroupButtons")?.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-income-group]");
   if (!btn) return;
   const form = $("#tobaccoForm");
@@ -2704,7 +2636,24 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const kind = data.kind || incomingKind;
-  if (kind === "tobacco") return;
+  if (kind === "tobacco") {
+    addTobaccoIncome({
+      date: data.date,
+      group: data.group,
+      product: (data.product || "").trim(),
+      qty: data.qty,
+      sum: data.sum,
+      supplier: (data.supplier || "").trim(),
+      note: (data.note || "").trim(),
+    });
+    save();
+    e.target.reset();
+    incomingKind = "tobacco";
+    setTodayDefaults();
+    renderTobacco();
+    renderRevision();
+    return;
+  }
   if (kind === "coal") {
     addCoalIncome({
       date: data.date,
@@ -2960,9 +2909,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "53") {
+  if (localStorage.getItem("journal-sw") !== "54") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "53");
+    localStorage.setItem("journal-sw", "54");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();
