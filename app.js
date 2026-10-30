@@ -1,8 +1,10 @@
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
-const CLOUD_BASE = "https://crudcrud.com/api/110ce53c0d0e41e2bbade7b51a33f4bf/journal";
-const CLOUD_URL = `${CLOUD_BASE}/6ae4dd404b7cf403e88e95c5`;
-const CLOUD_FALLBACK = "./journal-cloud.json";
+const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
+const MQTT_BROKERS = [
+  "wss://broker.emqx.io:8084/mqtt",
+  "wss://broker.hivemq.com:8884/mqtt",
+];
 
 const VENUES = {
   tangiers: "Tangiers",
@@ -559,8 +561,8 @@ function shouldUseRemote(remote, local) {
   const rf = dbFill(remote);
   const lf = dbFill(local);
   if (rf === 0 && lf > 0) return false;
-  if (rt > lt) return lf === 0 || rf >= lf * 0.5;
-  if (lt === 0 && rf > lf) return true;
+  if (lf === 0 && rf > 0) return true;
+  if (rt > lt) return true;
   if (rt === lt && rf > lf) return true;
   return false;
 }
@@ -591,57 +593,106 @@ function save() {
 let cloudReady = false;
 let cloudApplying = false;
 let cloudTimer = 0;
-let cloudPoll = 0;
+let mqttPing = 0;
+let lastRemote = null;
+const mqttSockets = [];
+const mqttEncoder = new TextEncoder();
+const mqttDecoder = new TextDecoder();
 
-function queueCloudPush() {
-  if (cloudApplying) return;
-  window.clearTimeout(cloudTimer);
-  cloudTimer = window.setTimeout(() => {
-    if (!cloudReady) {
-      queueCloudPush();
-      return;
-    }
-    pushCloud().catch(() => {});
-  }, 400);
+function mqttStr(text) {
+  const bytes = mqttEncoder.encode(text);
+  const out = new Uint8Array(2 + bytes.length);
+  out[0] = (bytes.length >> 8) & 255;
+  out[1] = bytes.length & 255;
+  out.set(bytes, 2);
+  return out;
 }
 
-async function fetchWithTimeout(url, opts = {}, ms = 12000) {
-  const ctrl = new AbortController();
-  const timer = window.setTimeout(() => ctrl.abort(), ms);
-  try {
-    return await fetch(url, { cache: "no-store", ...opts, signal: ctrl.signal });
-  } finally {
-    window.clearTimeout(timer);
+function mqttRemain(n) {
+  const bytes = [];
+  do {
+    let digit = n % 128;
+    n = Math.floor(n / 128);
+    if (n > 0) digit |= 128;
+    bytes.push(digit);
+  } while (n > 0);
+  return bytes;
+}
+
+function mqttConcat(parts) {
+  const size = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(size);
+  let offset = 0;
+  parts.forEach((part) => {
+    out.set(part, offset);
+    offset += part.length;
+  });
+  return out;
+}
+
+function mqttPacket(typeFlags, payload) {
+  const remain = mqttRemain(payload.length);
+  const out = new Uint8Array(1 + remain.length + payload.length);
+  out[0] = typeFlags;
+  out.set(remain, 1);
+  out.set(payload, 1 + remain.length);
+  return out;
+}
+
+function mqttConnectPacket() {
+  const proto = mqttStr("MQTT");
+  const header = mqttConcat([proto, Uint8Array.of(4, 2, 0, 45)]);
+  const id = `comfort-${Math.random().toString(16).slice(2, 10)}`;
+  return mqttPacket(0x10, mqttConcat([header, mqttStr(id)]));
+}
+
+function mqttPublishPacket(text) {
+  return mqttPacket(0x31, mqttConcat([mqttStr(MQTT_TOPIC), mqttEncoder.encode(text)]));
+}
+
+function mqttSubscribePacket() {
+  return mqttPacket(0x82, mqttConcat([Uint8Array.of(0, 1), mqttStr(MQTT_TOPIC), Uint8Array.of(0)]));
+}
+
+function mqttParse(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const packets = [];
+  let index = 0;
+  while (index < bytes.length) {
+    const type = bytes[index] >> 4;
+    let multiply = 1;
+    let length = 0;
+    let pos = index + 1;
+    let guard = 0;
+    while (pos < bytes.length && guard < 4) {
+      const digit = bytes[pos];
+      pos += 1;
+      length += (digit & 127) * multiply;
+      if ((digit & 128) === 0) break;
+      multiply *= 128;
+      guard += 1;
+    }
+    packets.push({
+      type,
+      flags: bytes[index] & 0x0f,
+      payload: bytes.slice(pos, pos + length),
+    });
+    index = pos + length;
   }
+  return packets;
 }
 
 function asJournal(raw) {
   if (!raw) return null;
-  if (Array.isArray(raw)) {
-    const rows = raw.filter((row) => row && (!row.app || row.app === "comfort-journal"));
-    rows.sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
-    raw = rows[0];
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
   if (!raw || (raw.app && raw.app !== "comfort-journal")) return null;
   return raw;
-}
-
-async function fetchCloud() {
-  const item = await fetchWithTimeout(CLOUD_URL);
-  if (item.ok) return asJournal(await item.json());
-  const list = await fetchWithTimeout(CLOUD_BASE);
-  if (list.ok) return asJournal(await list.json());
-  const fallback = await fetchWithTimeout(`${CLOUD_FALLBACK}?t=${Date.now()}`);
-  if (fallback.ok) return asJournal(await fallback.json());
-  throw new Error("cloud");
-}
-
-async function pullCloud() {
-  try {
-    return await fetchCloud();
-  } catch {
-    return null;
-  }
 }
 
 function applyRemote(remote, status) {
@@ -655,65 +706,132 @@ function applyRemote(remote, status) {
   setSyncStatus(status);
 }
 
-async function pushCloud() {
-  if (!cloudReady || cloudApplying) return;
-  const body = JSON.stringify(packedDb());
-  setSyncStatus("Сохраняю…");
-  try {
-    const res = await fetchWithTimeout(CLOUD_URL, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
-    if (!res.ok) throw new Error("push");
-    setSyncStatus("Сохранено на телефон и ноут");
-  } catch {
-    setSyncStatus("Не удалось сохранить в облако — нажми сюда ещё раз");
-  }
-}
-
-async function refreshCloud(force = false) {
-  if (!cloudReady || cloudApplying) return;
-  const active = document.activeElement;
-  if (!force && active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
-  const remote = await pullCloud();
-  if (!remote) {
-    setSyncStatus("Нет сети — данные пока только на этом устройстве");
-    return;
-  }
+function handleCloudMessage(text) {
+  const remote = asJournal(text);
+  if (!remote?.venues) return;
+  lastRemote = remote;
+  if (cloudApplying) return;
   if (shouldUseRemote(remote, db)) {
     applyRemote(remote, "Подтянул свежие данные");
   }
 }
 
+function liveMqttSockets() {
+  return mqttSockets.filter((ws) => ws.readyState === WebSocket.OPEN);
+}
+
+function pushCloud() {
+  const open = liveMqttSockets();
+  if (!open.length) {
+    setSyncStatus("Нет сети — пока только на этом устройстве");
+    mqttConnectAll();
+    return false;
+  }
+  const body = JSON.stringify(packedDb());
+  const packet = mqttPublishPacket(body);
+  open.forEach((ws) => ws.send(packet));
+  setSyncStatus("Сохранено на телефон и ноут");
+  return true;
+}
+
+function queueCloudPush() {
+  if (cloudApplying) return;
+  window.clearTimeout(cloudTimer);
+  cloudTimer = window.setTimeout(() => {
+    if (!cloudReady) {
+      queueCloudPush();
+      return;
+    }
+    pushCloud();
+  }, 300);
+}
+
+function bindMqttSocket(ws, url) {
+  ws.binaryType = "arraybuffer";
+  ws.addEventListener("message", (event) => {
+    mqttParse(event.data).forEach((packet) => {
+      if (packet.type === 2) {
+        ws.send(mqttSubscribePacket());
+        return;
+      }
+      if (packet.type !== 3) return;
+      const payload = packet.payload;
+      const topicLen = (payload[0] << 8) + payload[1];
+      const qos = (packet.flags >> 1) & 3;
+      const start = 2 + topicLen + (qos ? 2 : 0);
+      handleCloudMessage(mqttDecoder.decode(payload.slice(start)));
+    });
+  });
+  ws.addEventListener("close", () => {
+    const index = mqttSockets.indexOf(ws);
+    if (index >= 0) mqttSockets.splice(index, 1);
+    window.setTimeout(() => mqttConnect(url), 2500);
+  });
+  ws.addEventListener("error", () => {
+    try {
+      ws.close();
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+function mqttConnect(url) {
+  if (mqttSockets.some((ws) => ws._broker === url && ws.readyState <= 1)) return;
+  try {
+    const ws = new WebSocket(url, "mqtt");
+    ws._broker = url;
+    mqttSockets.push(ws);
+    bindMqttSocket(ws, url);
+    ws.addEventListener("open", () => {
+      ws.send(mqttConnectPacket());
+    });
+  } catch {
+    window.setTimeout(() => mqttConnect(url), 4000);
+  }
+}
+
+function mqttConnectAll() {
+  MQTT_BROKERS.forEach((url) => mqttConnect(url));
+}
+
+function startMqttPing() {
+  window.clearInterval(mqttPing);
+  mqttPing = window.setInterval(() => {
+    liveMqttSockets().forEach((ws) => ws.send(Uint8Array.of(0xc0, 0x00)));
+  }, 20000);
+}
+
 async function bootCloud() {
   navigator.storage?.persist?.().catch(() => {});
   setSyncStatus("Загружаю общие данные…");
-  const remote = await pullCloud();
+  mqttConnectAll();
+  startMqttPing();
+  const started = Date.now();
+  while (Date.now() - started < 4000 && !liveMqttSockets().length) {
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+  }
   cloudReady = true;
-  if (shouldUseRemote(remote, db)) {
-    applyRemote(remote, "Данные с телефона и ноута");
-  } else if (dbFill(db) > dbFill(remote)) {
-    await pushCloud();
-  } else if (remote) {
-    setSyncStatus("Данные с телефона и ноута");
+  await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  if (!liveMqttSockets().length) {
+    setSyncStatus("Нет сети — пока только на этом устройстве");
+  } else if (
+    !lastRemote
+    || Number(db.updatedAt || 0) > Number(lastRemote.updatedAt || 0)
+    || dbFill(db) > dbFill(lastRemote)
+  ) {
+    pushCloud();
   } else {
-    setSyncStatus("Нет сети — данные пока только на этом устройстве");
+    setSyncStatus("Данные с телефона и ноута");
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") refreshCloud();
+    if (document.visibilityState === "visible") mqttConnectAll();
   });
-  window.addEventListener("online", () => refreshCloud(true));
-  window.addEventListener("focus", () => refreshCloud());
-  window.clearInterval(cloudPoll);
-  cloudPoll = window.setInterval(() => {
-    if (document.visibilityState === "visible") refreshCloud();
-  }, 8000);
+  window.addEventListener("online", () => mqttConnectAll());
   $("#syncStatus")?.addEventListener("click", () => {
     setSyncStatus("Обновляю…");
-    refreshCloud(true).then(() => {
-      if (dbFill(db) > 0) pushCloud().catch(() => {});
-    });
+    mqttConnectAll();
+    pushCloud();
   });
 }
 
