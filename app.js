@@ -1,5 +1,7 @@
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
+const CLOUD_URL = "https://crudcrud.com/api/d49d4e06e88b46bb9924b8f74c888f34/journal/6ae4d8890e887f03e8536ec3";
+const CLOUD_FALLBACK = "./journal-cloud.json";
 
 const VENUES = {
   tangiers: "Tangiers",
@@ -493,35 +495,188 @@ function loadDb() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY));
     if (raw?.venues) {
-      return {
-        current: VENUES[raw.current] ? raw.current : "tangiers",
-        venues: {
-          tangiers: normalizeVenue(raw.venues.tangiers, "tangiers"),
-          shishka: normalizeVenue(raw.venues.shishka, "shishka"),
-        },
-      };
+      return unpackDb(raw);
     }
     const old = JSON.parse(localStorage.getItem(OLD_KEY));
-    return {
+    return unpackDb({
       current: "tangiers",
-      venues: {
-        tangiers: normalizeVenue(old, "tangiers"),
-        shishka: normalizeVenue({}, "shishka"),
-      },
-    };
+      venues: { tangiers: old, shishka: {} },
+    });
   } catch {
-    return {
-      current: "tangiers",
-      venues: {
-        tangiers: normalizeVenue({}, "tangiers"),
-        shishka: normalizeVenue({}, "shishka"),
-      },
-    };
+    return unpackDb(null);
   }
 }
 
+function unpackDb(raw) {
+  const empty = {
+    current: "tangiers",
+    updatedAt: 0,
+    venues: {
+      tangiers: normalizeVenue({}, "tangiers"),
+      shishka: normalizeVenue({}, "shishka"),
+    },
+  };
+  if (!raw?.venues) return empty;
+  return {
+    current: VENUES[raw.current] ? raw.current : "tangiers",
+    updatedAt: Number(raw.updatedAt || 0),
+    venues: {
+      tangiers: normalizeVenue(raw.venues.tangiers, "tangiers"),
+      shishka: normalizeVenue(raw.venues.shishka, "shishka"),
+    },
+  };
+}
+
+function packedDb() {
+  return {
+    app: "comfort-journal",
+    updatedAt: Number(db.updatedAt || 0),
+    current: db.current,
+    venues: db.venues,
+  };
+}
+
+function dbFill(raw) {
+  const venues = raw?.venues || {};
+  let n = 0;
+  Object.values(venues).forEach((venue) => {
+    if (!venue) return;
+    n += Object.keys(venue.schedule || {}).length;
+    n += (venue.tobacco || []).length;
+    n += (venue.fines || []).length;
+    n += (venue.hookahSales || []).length;
+    n += (venue.revisions || []).length;
+    n += Object.keys(venue.extras || {}).length;
+  });
+  return n;
+}
+
+function shouldUseRemote(remote, local) {
+  if (!remote?.venues) return false;
+  const rt = Number(remote.updatedAt || 0);
+  const lt = Number(local?.updatedAt || 0);
+  const rf = dbFill(remote);
+  const lf = dbFill(local);
+  if (rf === 0 && lf > 0) return false;
+  if (rt > lt) return lf === 0 || rf >= lf * 0.5;
+  if (lt === 0 && rf > lf) return true;
+  if (rt === lt && rf > lf) return true;
+  return false;
+}
+
+function applyCloud(raw) {
+  const next = unpackDb(raw);
+  db.current = next.current;
+  db.updatedAt = next.updatedAt;
+  db.venues = next.venues;
+  state = db.venues[db.current];
+}
+
+function saveLocal() {
+  localStorage.setItem(KEY, JSON.stringify(packedDb()));
+}
+
+function setSyncStatus(text) {
+  const el = $("#syncStatus");
+  if (el) el.textContent = text;
+}
+
 function save() {
-  localStorage.setItem(KEY, JSON.stringify(db));
+  db.updatedAt = Date.now();
+  saveLocal();
+  queueCloudPush();
+}
+
+let cloudReady = false;
+let cloudApplying = false;
+let cloudTimer = 0;
+
+function queueCloudPush() {
+  if (!cloudReady || cloudApplying) return;
+  window.clearTimeout(cloudTimer);
+  cloudTimer = window.setTimeout(() => {
+    pushCloud().catch(() => {});
+  }, 800);
+}
+
+async function fetchCloud() {
+  const res = await fetch(CLOUD_URL, { cache: "no-store" });
+  if (res.ok) return res.json();
+  const fallback = await fetch(`${CLOUD_FALLBACK}?t=${Date.now()}`, { cache: "no-store" });
+  if (fallback.ok) return fallback.json();
+  throw new Error("cloud");
+}
+
+async function pullCloud() {
+  try {
+    const raw = await fetchCloud();
+    if (!raw) return null;
+    if (raw.app && raw.app !== "comfort-journal") return null;
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
+async function pushCloud() {
+  if (!cloudReady || cloudApplying) return;
+  const body = JSON.stringify(packedDb());
+  setSyncStatus("Сохраняю…");
+  try {
+    const res = await fetch(CLOUD_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+    if (!res.ok) throw new Error("push");
+    setSyncStatus("Сохранено на телефон и ноут");
+  } catch {
+    setSyncStatus("Нет сети — пока только на этом устройстве");
+  }
+}
+
+async function refreshCloud() {
+  if (!cloudReady || cloudApplying) return;
+  const active = document.activeElement;
+  if (active && /INPUT|TEXTAREA|SELECT/.test(active.tagName)) return;
+  const remote = await pullCloud();
+  if (!remote) return;
+  if (shouldUseRemote(remote, db)) {
+    cloudApplying = true;
+    applyCloud(remote);
+    saveLocal();
+    syncVenueUi();
+    setTodayDefaults();
+    render();
+    cloudApplying = false;
+    setSyncStatus("Подтянул свежие данные");
+  }
+}
+
+async function bootCloud() {
+  navigator.storage?.persist?.().catch(() => {});
+  setSyncStatus("Загружаю общие данные…");
+  const remote = await pullCloud();
+  cloudReady = true;
+  if (shouldUseRemote(remote, db)) {
+    cloudApplying = true;
+    applyCloud(remote);
+    saveLocal();
+    syncVenueUi();
+    setTodayDefaults();
+    render();
+    cloudApplying = false;
+    setSyncStatus("Данные с телефона и ноута");
+  } else if (dbFill(db) > dbFill(remote)) {
+    await pushCloud();
+  } else {
+    setSyncStatus("Данные с телефона и ноута");
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshCloud();
+  });
+  window.addEventListener("online", () => refreshCloud());
+  window.addEventListener("focus", () => refreshCloud());
 }
 
 function venueName() {
@@ -2454,6 +2609,7 @@ function importDb(file) {
         shishka: normalizeVenue(raw.venues.shishka, "shishka"),
       };
       state = db.venues[db.current];
+      db.updatedAt = Date.now();
       save();
       syncVenueUi();
       setTodayDefaults();
@@ -2500,4 +2656,4 @@ if ("serviceWorker" in navigator) {
 syncVenueUi();
 setTodayDefaults();
 render();
-save();
+bootCloud();

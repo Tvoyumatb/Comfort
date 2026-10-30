@@ -1,9 +1,9 @@
-const CACHE = "journal-v48";
+const CACHE = "journal-v49";
 const FILES = [
   "./",
   "./index.html",
-  "./style.css?v=47",
-  "./app.js?v=48",
+  "./style.css?v=49",
+  "./app.js?v=49",
   "./wallpaper-tangiers.jpg",
   "./tangiers-logo.png",
   "./manifest.webmanifest",
@@ -27,6 +27,13 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  const live = url.origin !== self.location.origin
+    || url.pathname.endsWith("/journal-cloud.json");
+  if (live) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   event.respondWith(
     fetch(event.request)
       .then((response) => {
