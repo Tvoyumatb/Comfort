@@ -1,12 +1,7 @@
-const CACHE = "journal-v51";
+const CACHE = "journal-v52";
 const FILES = [
-  "./",
-  "./index.html",
-  "./style.css?v=51",
-  "./app.js?v=51",
   "./wallpaper-tangiers.jpg",
   "./tangiers-logo.png",
-  "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
 ];
@@ -28,10 +23,15 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  const live = url.origin !== self.location.origin
-    || url.pathname.endsWith("/journal-cloud.json");
-  if (live) {
+  if (url.origin !== self.location.origin) {
     event.respondWith(fetch(event.request));
+    return;
+  }
+  const live = /\.(?:js|css|html|webmanifest)$/.test(url.pathname) || url.pathname.endsWith("/");
+  if (live) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" }).catch(() => caches.match(event.request))
+    );
     return;
   }
   event.respondWith(
