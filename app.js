@@ -1,4 +1,4 @@
-const APP_VERSION = "81";
+const APP_VERSION = "82";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -492,6 +492,7 @@ function normalizeVenue(data, venueId) {
     startFromAug28V1: Boolean(data.startFromAug28V1),
     invoicesFromStartV1: Boolean(data.invoicesFromStartV1),
     monthlyCountV1: Boolean(data.monthlyCountV1),
+    loungeBoughtV1: Boolean(data.loungeBoughtV1),
   };
   return applySplitClassicPack(applyMonthlyCount(applyStartInvoices(
     shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId),
@@ -1992,6 +1993,67 @@ function clearStockWatch(name) {
   if (stockNow(item) >= stockTarget(item)) item.alert = false;
 }
 
+function isHypeBowl(name) {
+  return /hype/i.test(String(name || ""));
+}
+
+function ensureHypeBowl() {
+  const stock = ensureInventory();
+  const found = stock.find((item) => isHypeBowl(item.name));
+  if (found) {
+    found.kind = "bowl";
+    return found;
+  }
+  const created = { id: uid(), name: "Hype", start: 0, kind: "bowl", alert: true };
+  stock.push(created);
+  return created;
+}
+
+function buyWithoutInvoice(name, qty = 1, kind = "inventory") {
+  const amount = Math.max(1, Number(qty || 1));
+  const product = kind === "coal" ? ensureCoalItem(name).name : ensureStockItem(name, /чаш|hype/i.test(name) ? "bowl" : "item").name;
+  if (!Array.isArray(state.tobacco)) state.tobacco = [];
+  state.tobacco.push({
+    id: uid(),
+    kind,
+    date: todayISO(),
+    product,
+    supplier: "",
+    qty: amount,
+    sum: 0,
+    note: "закуп без накладной",
+  });
+  if (kind === "inventory") {
+    const item = ensureStockItem(product);
+    if (stockNow(item) >= stockTarget(item)) item.alert = false;
+  }
+}
+
+function settleBoughtExceptHype() {
+  if (state.loungeBoughtV1) return;
+  ensureHypeBowl();
+  ensureInventory().forEach((item) => {
+    if (isHypeBowl(item.name)) {
+      item.alert = true;
+      return;
+    }
+    if (!stockNeedsBuy(item)) {
+      item.alert = false;
+      return;
+    }
+    const need = Math.max(1, stockTarget(item) - stockNow(item));
+    buyWithoutInvoice(item.name, need, "inventory");
+    item.alert = false;
+  });
+  ensureCoalStock().forEach((item) => {
+    const now = coalNow(item);
+    if (now > 0) return;
+    buyWithoutInvoice(item.name, Math.max(1, -now + 1), "coal");
+  });
+  state.loungeBoughtV1 = true;
+  save();
+}
+
 function coalNow(item) {
   return Number(item.start || 0) + incomingQtyFor(item.name, "coal");
 }
@@ -2304,7 +2366,7 @@ function renderStockRows(items, { restockAttr, startAttr, delAttr, extraCols, co
         ${extra.mid}
         <td class="sum">${now} ${extra.unit}</td>
         <td>
-          <button type="button" class="ghost restock" ${restockAttr}="${escapeHtml(item.name)}">Дозакупить</button>
+          <button type="button" class="primary compact" ${restockAttr}="${escapeHtml(item.name)}" aria-label="Закупил">+</button>
           <button type="button" class="danger" ${delAttr}="${item.id}">Удалить</button>
         </td>
       </tr>
@@ -2321,16 +2383,23 @@ function renderLoungeAlerts() {
     badge.textContent = rows.length ? String(rows.length) : "";
   }
   if (!box) return;
-  if (!rows.length) {
-    box.innerHTML = "";
-    return;
-  }
+  const list = rows.length
+    ? rows.map((row) => `
+        <div class="need-row">
+          <span><strong>${escapeHtml(row.name)}</strong> — ${escapeHtml(row.reason)}</span>
+          <button type="button" class="primary compact" data-buy="${escapeHtml(row.restock)}" data-buy-kind="${row.coal ? "coal" : "inventory"}">+</button>
+        </div>
+      `).join("")
+    : `<p class="need-ok">Нехватки нет</p>`;
   box.innerHTML = `
     <div class="lounge-alert">
-      <p>Нужно закупить и вернуть:</p>
-      <ul>
-        ${rows.map((row) => `<li><strong>${escapeHtml(row.name)}</strong> — ${escapeHtml(row.reason)}</li>`).join("")}
-      </ul>
+      <p>Нехватка</p>
+      ${list}
+      <form class="add-brand need-buy-form" id="needBuyForm">
+        <input type="text" name="name" list="fineWhatList" placeholder="Что закупил без накладной" required>
+        <input type="number" name="qty" min="1" step="1" value="1" inputmode="numeric" aria-label="Штук">
+        <button type="submit" class="primary compact">+</button>
+      </form>
     </div>
   `;
 }
@@ -2425,6 +2494,7 @@ function renderInventoryStock() {
 }
 
 function renderLounge() {
+  settleBoughtExceptHype();
   renderLoungeAlerts();
   renderInventoryStock();
   renderFines();
@@ -3327,25 +3397,29 @@ document.addEventListener("click", (e) => {
     renderShifts();
     renderLounge();
   }
+  const buy = e.target.dataset.buy;
+  if (buy) {
+    buyWithoutInvoice(buy, 1, e.target.dataset.buyKind === "coal" ? "coal" : "inventory");
+    save();
+    renderLounge();
+    renderTobacco();
+    return;
+  }
   const restock = e.target.dataset.restock;
   if (restock) {
-    incomingKind = "inventory";
+    buyWithoutInvoice(restock, 1, "inventory");
+    save();
+    renderLounge();
     renderTobacco();
-    const select = $("#stockProductSelect");
-    if (select) select.value = restock;
-    const qty = document.querySelector('#tobaccoForm [name="qty"]');
-    if (qty) qty.focus();
-    $("#tobaccoForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
   }
   const restockCoal = e.target.dataset.restockCoal;
   if (restockCoal) {
-    incomingKind = "coal";
+    buyWithoutInvoice(restockCoal, 1, "coal");
+    save();
+    renderLounge();
     renderTobacco();
-    const nameInput = document.querySelector('#coalForm [name="product"]');
-    if (nameInput) nameInput.value = restockCoal;
-    const packs = document.querySelector('#coalForm [name="packs"]');
-    if (packs) packs.focus();
-    $("#coalForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
   }
   const stockId = e.target.dataset.delStock;
   if (stockId) {
@@ -3394,6 +3468,20 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("submit", (e) => {
+  if (e.target.id === "needBuyForm") {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    const name = (data.name || "").trim();
+    if (!name) return;
+    buyWithoutInvoice(name, data.qty, /угол/i.test(name) ? "coal" : "inventory");
+    save();
+    e.target.reset();
+    const qty = e.target.querySelector('[name="qty"]');
+    if (qty) qty.value = "1";
+    renderLounge();
+    renderTobacco();
+    return;
+  }
   if (e.target.id === "addCoalStockForm") {
     e.preventDefault();
     const name = new FormData(e.target).get("name").trim();

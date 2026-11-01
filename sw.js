@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v81 lounge tab and monthly revision
+  // v82 shortage plus buy without invoice
   event.waitUntil(self.skipWaiting());
 });
 

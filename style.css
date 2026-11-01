@@ -1598,6 +1598,33 @@ body.report-open::before {
   margin: 4px 0;
 }
 
+.need-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.need-row span {
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.need-ok {
+  margin: 0 0 8px;
+  color: #b8f0c9;
+}
+
+.need-buy-form {
+  margin-top: 8px;
+}
+
+.need-buy-form input[name="qty"] {
+  width: 64px;
+  min-width: 64px;
+}
+
 .stock-table input {
   min-width: 64px;
 }

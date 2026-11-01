@@ -39,11 +39,11 @@
       }
       var css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = "style.css?v=81&n=" + params.get("n");
+      css.href = "style.css?v=82&n=" + params.get("n");
       document.head.appendChild(css);
       window.addEventListener("DOMContentLoaded", function () {
         var script = document.createElement("script");
-        script.src = "app.js?v=81&n=" + params.get("n");
+        script.src = "app.js?v=82&n=" + params.get("n");
         document.body.appendChild(script);
       });
     })();
@@ -277,7 +277,7 @@
         </p>
       </div>
       <div id="loungeAlerts"></div>
-      <p class="hint">Порча сразу минусует. Приход инвентаря плюсует. Красное висит, пока не закупишь и не вернёшь на место.</p>
+      <p class="hint">Порча минусует. Плюс в нехватке — уже закупил, даже без накладной.</p>
       <div id="inventoryStock"></div>
       <h2 class="block-title">Порча</h2>
       <form class="card form" id="fineForm">
