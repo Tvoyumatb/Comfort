@@ -1,4 +1,4 @@
-const APP_VERSION = "78";
+const APP_VERSION = "79";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1353,10 +1353,17 @@ function renderReport() {
   requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
 
+function syncReportOrientation() {
+  const landscape = window.matchMedia("(orientation: landscape)").matches;
+  document.body.classList.toggle("report-land", landscape);
+  document.body.classList.toggle("report-port", !landscape);
+}
+
 function fitReportPaper() {
   const paper = $("#reportPaper");
   const frame = paper?.closest(".report-frame");
   if (!paper || !frame || $("#reportView")?.hidden) return;
+  syncReportOrientation();
   paper.style.transform = "none";
   paper.style.width = `${frame.clientWidth}px`;
   const width = Math.max(paper.scrollWidth, paper.offsetWidth, 1);
@@ -1404,7 +1411,7 @@ function renderRevisionReport() {
   const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
   const { month, snap } = revisionReportLabel(rev);
   let itemCount = 0;
-  const body = groups.map((group) => {
+  const cols = groups.map((group) => {
     const rows = (rev.items || []).filter((item) => itemGroup(item) === group.id);
     if (!rows.length) return "";
     itemCount += rows.length;
@@ -1420,13 +1427,21 @@ function renderRevisionReport() {
       </tr>`;
     }).join("");
     return `
-      <tr class="rev-g group-${group.id}"><th colspan="3">${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</th></tr>
-      ${list}
-      <tr class="rev-sum">
-        <th class="name">Итого</th>
-        <td>${formatGrams(sum)}</td>
-        <td>${prev ? formatGrams(usedSum) : ""}</td>
-      </tr>
+      <table class="rev-shot-sheet">
+        <colgroup><col class="name"><col class="num"><col class="num"></colgroup>
+        <thead>
+          <tr class="rev-g group-${group.id}"><th colspan="3">${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</th></tr>
+          <tr><th class="name">Марка</th><th>г</th><th>−</th></tr>
+        </thead>
+        <tbody>
+          ${list}
+          <tr class="rev-sum">
+            <th class="name">Итого</th>
+            <td>${formatGrams(sum)}</td>
+            <td>${prev ? formatGrams(usedSum) : ""}</td>
+          </tr>
+        </tbody>
+      </table>
     `;
   }).join("");
   const prevTotal = prev ? revisionTotal(prev) : 0;
@@ -1436,18 +1451,14 @@ function renderRevisionReport() {
   const nowCoals = Number(rev.coals || 0);
   const usedCoalsN = prev ? prevCoals - nowCoals : null;
   paper.classList.add("rev-shot");
-  paper.classList.toggle("is-dense", itemCount > 16);
+  paper.classList.toggle("is-dense", itemCount > 14);
   paper.innerHTML = `
     <header class="report-head">
       <h1>${escapeHtml(venueName())} · Ревизия</h1>
       <p class="report-rates">${month} · снятие ${snap}</p>
     </header>
-    ${body
-      ? `<table class="rev-shot-sheet">
-          <colgroup><col class="name"><col class="num"><col class="num"></colgroup>
-          <thead><tr><th class="name">Марка</th><th>г</th><th>−</th></tr></thead>
-          <tbody>${body}</tbody>
-        </table>`
+    ${cols
+      ? `<div class="rev-shot-cols">${cols}</div>`
       : `<p class="rev-shot-empty">Марок в этом месяце нет</p>`}
     <table class="rev-shot-sheet rev-shot-foot">
       <colgroup><col class="name"><col class="num"><col class="num"><col class="num"></colgroup>
@@ -3405,7 +3416,10 @@ window.addEventListener("resize", () => {
   if (!$("#reportView")?.hidden) fitReportPaper();
 });
 window.addEventListener("orientationchange", () => {
-  setTimeout(fitReportPaper, 250);
+  setTimeout(fitReportPaper, 280);
+});
+window.visualViewport?.addEventListener("resize", () => {
+  if (!$("#reportView")?.hidden) fitReportPaper();
 });
 
 $("#printBtn").addEventListener("click", () => {

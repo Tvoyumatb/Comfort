@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v78 pro max revision sheet
+  // v79 portrait and landscape reports
   event.waitUntil(self.skipWaiting());
 });
 
