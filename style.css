@@ -620,10 +620,11 @@ input[type="number"] {
 }
 
 .primary.compact {
-  width: 48px;
+  width: auto;
   min-width: 48px;
   margin: 0;
-  font-size: 24px;
+  padding: 0 12px;
+  font-size: 15px;
 }
 
 .sheet {
@@ -846,9 +847,11 @@ input[type="number"] {
 
 .add-brand {
   display: grid;
-  grid-template-columns: 1fr 48px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  padding: 10px 10px 10px 14px;
+  padding: 10px;
+  max-width: 100%;
+  min-width: 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -895,6 +898,11 @@ input[type="number"] {
 
 .add-brand input {
   margin: 0;
+  min-width: 0;
+}
+
+.add-brand button {
+  white-space: nowrap;
 }
 
 .hint {
@@ -1625,6 +1633,25 @@ body.report-open::before {
   margin-bottom: 10px;
 }
 
+.hall-fine .row {
+  grid-template-columns: 1fr 1fr;
+}
+
+.hall-pack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hall-pack input {
+  width: 72px;
+  min-width: 72px;
+  margin: 0;
+}
+
 .hall-fines {
   margin-bottom: 18px;
 }
@@ -1688,6 +1715,8 @@ body.report-open::before {
   margin: 0;
   font-size: 16px;
   font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .hall-card-top b {

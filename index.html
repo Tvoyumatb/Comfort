@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "90";
+      var BUILD = "91";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -262,7 +262,7 @@
 
       <form class="card form" id="coalForm" hidden>
         <h2>Добавить уголь</h2>
-        <p class="hint">Выбери или впиши название угля. Пачка — 72 шт, они плюсуются к остатку в ревизии.</p>
+        <p class="hint">Коробка обычно 72 шт. Если приедет другая — поменяй число в коробке.</p>
         <label>Название угля
           <input type="text" name="product" list="coalNamesList" placeholder="Например CocoNara" required>
         </label>
@@ -273,10 +273,10 @@
           </span>
         </label>
         <div class="row">
-          <label>Пачек
+          <label>Коробок
             <input type="number" name="packs" min="1" step="1" value="1" required>
           </label>
-          <label>Шт в пачке
+          <label>Шт в коробке
             <input type="number" name="perPack" min="1" step="1" value="72">
           </label>
         </div>
@@ -286,7 +286,7 @@
         <label>Комментарий
           <input type="text" name="note" placeholder="Поставщик / накладная">
         </label>
-        <button type="submit" class="primary">Добавить пачки</button>
+        <button type="submit" class="primary">Добавить коробки</button>
       </form>
 
       <div class="list" id="tobaccoList"></div>
@@ -294,10 +294,12 @@
 
     <section id="lounge" class="panel" role="tabpanel" hidden>
       <div class="period-bar">
-        <p class="period-label">
-          <strong>Зал</strong>
-          <span>Сломали — сверху. Что пришло — на карточках.</span>
-        </p>
+        <button type="button" class="icon-btn" id="prevLoungeMonth" aria-label="Предыдущий месяц">‹</button>
+        <div class="period-label">
+          <strong id="loungeMonthLabel">—</strong>
+          <span>Порча этого месяца. В следующем месяце список новый.</span>
+        </div>
+        <button type="button" class="icon-btn" id="nextLoungeMonth" aria-label="Следующий месяц">›</button>
       </div>
       <div id="loungeAlerts"></div>
       <h2 class="block-title">Сломали</h2>

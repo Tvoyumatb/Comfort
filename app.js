@@ -1,4 +1,4 @@
-const APP_VERSION = "90";
+const APP_VERSION = "91";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -79,7 +79,7 @@ const DEFAULT_EMPLOYEES = [
   "Азиз Арсланов",
 ];
 
-const SHIFT_ORDER = ["", "morning", "evening", "eveningWe", "intern"];
+const SHIFT_ORDER = ["", "morning", "evening", "intern"];
 const SHIFT_LABEL = {
   "": "/",
   morning: "Утро",
@@ -123,7 +123,7 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Сначала добавь название угля, потом пачки. В пачке 72 шт",
+    hint: "Сначала добавь название угля, потом коробки. Обычно 72 шт в коробке",
     name: "Название угля",
     placeholder: "CocoNara, Tom Coco...",
     qty: "Пачек",
@@ -138,6 +138,7 @@ let state = db.venues[db.current];
 let shownRevDate = OPENING_DATE;
 let pendingSale = null;
 let viewRevMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let viewLoungeMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let viewMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let half = new Date().getDate() > 15 ? 1 : 0;
 let incomingKind = "tobacco";
@@ -957,11 +958,15 @@ function isWeekend(date) {
   return day === 0 || day === 5 || day === 6;
 }
 
+function shiftType(type) {
+  return type === "eveningWe" ? "evening" : (type || "");
+}
+
 function shiftClass(type, date) {
-  if (type === "morning") return "morning";
-  if (type === "intern") return "intern";
-  if (type === "eveningWe") return "evening-we";
-  if (type === "evening") return isWeekend(date) ? "evening-we" : "evening-wd";
+  const kind = shiftType(type);
+  if (kind === "morning") return "morning";
+  if (kind === "intern") return "intern";
+  if (kind === "evening") return isWeekend(date) ? "evening-we" : "evening-wd";
   return "";
 }
 
@@ -990,6 +995,57 @@ function inCurrentPeriod(iso) {
   const d = parseISODate(iso);
   const days = periodDays();
   return d >= days[0] && d <= days[days.length - 1];
+}
+
+function inLoungeMonth(iso) {
+  if (!iso) return false;
+  return monthKey(parseISODate(iso)) === monthKey(viewLoungeMonth);
+}
+
+function loungeDefaultDate() {
+  const today = new Date();
+  if (monthKey(today) === monthKey(viewLoungeMonth)) return todayISO();
+  return lastDayOfMonthISO(toISODate(viewLoungeMonth));
+}
+
+function syncLoungeMonthUi() {
+  const label = $("#loungeMonthLabel");
+  if (label) {
+    label.textContent = `${MONTHS_RU[viewLoungeMonth.getMonth()]} ${viewLoungeMonth.getFullYear()}`;
+  }
+  const dateInput = document.querySelector("#fineForm [name=\"date\"]");
+  if (!dateInput) return;
+  const monthISO = toISODate(viewLoungeMonth);
+  dateInput.min = `${monthKey(viewLoungeMonth)}-01`;
+  dateInput.max = lastDayOfMonthISO(monthISO);
+  dateInput.value = clampDateToMonth(dateInput.value || loungeDefaultDate(), monthISO);
+}
+
+function qtyInLoungeMonth(name, kind = "inventory") {
+  return (state.tobacco || [])
+    .filter((row) => (row.kind || "tobacco") === kind
+      && inLoungeMonth(row.date)
+      && String(row.product || "").toLowerCase() === String(name || "").toLowerCase())
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
+function packsInLoungeMonth(name, perPack) {
+  const size = Math.max(1, Number(perPack) || coalsPerPack());
+  return (state.tobacco || [])
+    .filter((row) => row.kind === "coal"
+      && inLoungeMonth(row.date)
+      && String(row.product || "").toLowerCase() === String(name || "").toLowerCase())
+    .reduce((sum, row) => sum + coalRowPacks(row, size), 0);
+}
+
+function monthBrokenQty(name) {
+  return (state.fines || [])
+    .filter((f) => inLoungeMonth(f.date) && String(f.what || "").toLowerCase() === String(name || "").toLowerCase())
+    .reduce((sum, f) => sum + Number(f.qty || 0), 0);
+}
+
+function monthNeedQty(item) {
+  return Math.max(0, monthBrokenQty(item.name) - qtyInLoungeMonth(item.name, "inventory"));
 }
 
 function ensureInventory() {
@@ -1077,13 +1133,12 @@ function extrasFor(empId) {
 function countShifts(empId) {
   const counts = { morning: 0, eveningWeekday: 0, eveningWeekend: 0, intern: 0 };
   periodDays().forEach((date) => {
-    const type = state.schedule[toISODate(date)]?.[empId] || "";
+    const type = shiftType(state.schedule[toISODate(date)]?.[empId] || "");
     if (type === "morning") counts.morning += 1;
     if (type === "intern") counts.intern += 1;
-    if (type === "eveningWe" || (type === "evening" && isWeekend(date))) {
-      counts.eveningWeekend += 1;
-    } else if (type === "evening") {
-      counts.eveningWeekday += 1;
+    if (type === "evening") {
+      if (isWeekend(date)) counts.eveningWeekend += 1;
+      else counts.eveningWeekday += 1;
     }
   });
   return counts;
@@ -1166,7 +1221,7 @@ function renderRoster() {
       </th>
       ${days.map((date) => {
         const iso = toISODate(date);
-        const type = state.schedule[iso]?.[emp.id] || "";
+        const type = shiftType(state.schedule[iso]?.[emp.id] || "");
         const cls = shiftClass(type, date);
         return `<td><button type="button" class="cell ${cls}" data-emp="${emp.id}" data-day="${iso}">${SHIFT_LABEL[type]}</button></td>`;
       }).join("")}
@@ -1216,7 +1271,9 @@ function renderPay() {
 }
 
 function renderFines() {
+  syncLoungeMonthUi();
   const rows = (state.fines || [])
+    .filter((f) => inLoungeMonth(f.date))
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const empSelect = $("#fineEmpSelect");
@@ -1225,14 +1282,12 @@ function renderFines() {
       .map((emp) => `<option value="${emp.id}">${escapeHtml(emp.name)}</option>`)
       .join("");
   }
-  const dateInput = document.querySelector('#fineForm [name="date"]');
-  if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
   fillDatalist("#fineWhatList", ensureInventory().map((item) => item.name));
   const list = $("#fineList");
   if (!list) return;
 
   if (!rows.length) {
-    list.innerHTML = `<p class="empty">Пока никто ничего не сломал</p>`;
+    list.innerHTML = `<p class="empty">В этом месяце порчи нет</p>`;
     return;
   }
   list.innerHTML = rows.map((f) => {
@@ -1274,7 +1329,7 @@ function renderReport() {
     ...visibleEmployees().flatMap((emp) => [
       `<div class="rt-name">${nameHtml(emp.name)}</div>`,
       ...days.map((date) => {
-        const type = state.schedule[toISODate(date)]?.[emp.id] || "";
+        const type = shiftType(state.schedule[toISODate(date)]?.[emp.id] || "");
         const cls = shiftClass(type, date);
         return `<div class="rt-shift cell ${cls}">${SHIFT_LABEL[type]}</div>`;
       }),
@@ -1568,8 +1623,8 @@ function cycleCell(btn) {
   const empId = btn.dataset.emp;
   const iso = btn.dataset.day;
   if (!state.schedule[iso]) state.schedule[iso] = {};
-  const current = state.schedule[iso][empId] || "";
-  const next = SHIFT_ORDER[(SHIFT_ORDER.indexOf(current) + 1) % SHIFT_ORDER.length];
+  const current = shiftType(state.schedule[iso][empId] || "");
+  const next = SHIFT_ORDER[(Math.max(0, SHIFT_ORDER.indexOf(current)) + 1) % SHIFT_ORDER.length];
   if (next) state.schedule[iso][empId] = next;
   else delete state.schedule[iso][empId];
   save();
@@ -1584,7 +1639,7 @@ function setTodayDefaults() {
   const today = toISODate(new Date());
   document.querySelector('#tobaccoForm [name="date"]').value = today;
   const fineDate = document.querySelector('#fineForm [name="date"]');
-  if (fineDate) fineDate.value = today;
+  if (fineDate) fineDate.value = loungeDefaultDate();
   if (!$("#revisionDate").value) {
     $("#revisionDate").value = todayISO();
     const now = new Date();
@@ -1812,11 +1867,32 @@ function coalRows(fromDate) {
 }
 
 function coalMeta(row) {
-  const packs = Number(row.packs || 0);
-  const perPack = Number(row.perPack || 0);
-  const pieces = Number(row.qty || 0);
-  if (packs > 0) return `${formatGrams(packs)} пач. × ${formatGrams(perPack || coalsPerPack())} = ${formatGrams(pieces)} шт`;
-  return `${formatGrams(pieces)} шт`;
+  const perPack = Number(row.perPack || coalsPerPack());
+  const packs = coalRowPacks(row, perPack);
+  const pieces = Number(row.qty || packs * perPack);
+  return `${formatBoxes(packs)} × ${formatGrams(perPack)} шт`;
+}
+
+function coalPackSize(item) {
+  return Math.max(1, Number(item?.perPack) || coalsPerPack());
+}
+
+function coalRowPacks(row, perPack) {
+  const size = Math.max(1, Number(row?.perPack || perPack) || coalsPerPack());
+  if (Number(row?.packs) > 0) return Number(row.packs);
+  return Number(row?.qty || 0) / size;
+}
+
+function incomingCoalPacks(name, perPack) {
+  const size = Math.max(1, Number(perPack) || coalsPerPack());
+  return (state.tobacco || [])
+    .filter((row) => row.kind === "coal" && String(row.product || "").toLowerCase() === String(name || "").toLowerCase())
+    .reduce((sum, row) => sum + coalRowPacks(row, size), 0);
+}
+
+function formatBoxes(n) {
+  const value = Math.round(Number(n || 0) * 10) / 10;
+  return `${value} кор.`;
 }
 
 function normalizeName(name) {
@@ -2001,14 +2077,15 @@ function stockAlertReason(item) {
 
 function loungeAlertRows() {
   return ensureInventory()
-    .filter((item) => stockNeedsBuy(item))
-    .map((item) => ({
-      name: item.name,
-      now: stockNow(item),
-      unit: stockUnit(item),
-      reason: stockAlertReason(item),
-      restock: item.name,
-      qty: itemNeedBuy(item),
+    .map((item) => ({ item, need: monthNeedQty(item) }))
+    .filter((row) => row.need > 0)
+    .map((row) => ({
+      name: row.item.name,
+      now: stockNow(row.item),
+      unit: stockUnit(row.item),
+      reason: row.need > 1 ? `закупить ${row.need} шт` : "закупить",
+      restock: row.item.name,
+      qty: row.need,
       coal: false,
     }));
 }
@@ -2035,10 +2112,28 @@ function buyWithoutInvoice(name, qty = 1, kind = "inventory") {
     ? ensureCoalItem(name).name
     : ensureStockItem(name, /чаш|hype|хайп/i.test(name) ? "bowl" : "item").name;
   if (!Array.isArray(state.tobacco)) state.tobacco = [];
+  const date = loungeDefaultDate();
+  if (kind === "coal") {
+    const item = ensureCoalItem(name);
+    const perPack = coalPackSize(item);
+    state.tobacco.push({
+      id: uid(),
+      kind,
+      date,
+      product,
+      packs: amount,
+      perPack,
+      qty: amount * perPack,
+      supplier: "",
+      sum: 0,
+      note: "закуп без накладной",
+    });
+    return;
+  }
   state.tobacco.push({
     id: uid(),
     kind,
-    date: todayISO(),
+    date,
     product,
     supplier: "",
     qty: amount,
@@ -2056,7 +2151,7 @@ function fulfillNeedBuy(name, kind = "inventory") {
     return;
   }
   const item = ensureStockItem(name, /чаш|hype|хайп/i.test(name) ? "bowl" : "item");
-  const qty = Math.max(1, itemNeedBuy(item) || 1);
+  const qty = Math.max(1, monthNeedQty(item) || itemNeedBuy(item) || 1);
   buyWithoutInvoice(item.name, qty, "inventory");
   item.needBuy = 0;
   item.alert = false;
@@ -2087,11 +2182,17 @@ function undoFalseBuys() {
 }
 
 function coalNow(item) {
-  return Number(item.start || 0) + incomingQtyFor(item.name, "coal");
+  const per = coalPackSize(item);
+  const startPacks = item.startPacks != null ? Number(item.startPacks || 0) : Number(item.start || 0) / per;
+  return startPacks + incomingCoalPacks(item.name, per);
 }
 
 function namedCoalOpening() {
-  return ensureCoalStock().reduce((sum, item) => sum + Number(item.start || 0), 0);
+  return ensureCoalStock().reduce((sum, item) => {
+    const per = coalPackSize(item);
+    const startPacks = item.startPacks != null ? Number(item.startPacks || 0) : Number(item.start || 0) / per;
+    return sum + startPacks * per;
+  }, 0);
 }
 
 function syncOpeningCoals() {
@@ -2384,12 +2485,10 @@ function renderTobacco() {
   renderInventoryStock();
 }
 
-function hallCard(item, { now, income, broken, restockAttr, delAttr, unit = "шт" }) {
-  const need = itemNeedBuy(item);
+function hallCard(item, { now, income, broken, restockAttr, delAttr, unit = "шт", need = 0, extra = "" }) {
   const tags = [
     income ? `<span class="hall-tag in">пришло +${income}</span>` : "",
     broken ? `<span class="hall-tag out">сломали −${broken}</span>` : "",
-    !income && !broken ? `<span class="hall-tag mute">без прихода</span>` : "",
   ].join("");
   return `
     <article class="hall-card ${need ? "is-need" : ""}">
@@ -2398,6 +2497,7 @@ function hallCard(item, { now, income, broken, restockAttr, delAttr, unit = "ш�
         <b>${now} ${unit}</b>
       </div>
       <p class="hall-tags">${tags}</p>
+      ${extra}
       ${need ? `<button type="button" class="primary compact" ${restockAttr}="${escapeHtml(item.name)}">Закупили ${need} шт</button>` : ""}
       <button type="button" class="text-del" ${delAttr}="${item.id}">убрать</button>
     </article>
@@ -2438,16 +2538,22 @@ function renderInventoryStock() {
       <div class="hall-grid">
         ${items.length ? items.map((item) => hallCard(item, coal
           ? {
-              now: coalNow(item),
-              income: incomingQtyFor(item.name, "coal"),
+              now: formatBoxes(coalNow(item)),
+              income: (() => {
+                const packs = packsInLoungeMonth(item.name, coalPackSize(item));
+                return packs ? formatBoxes(packs) : "";
+              })(),
               broken: 0,
+              unit: "",
               restockAttr: "data-restock-coal",
               delAttr: "data-del-coal-stock",
+              extra: `<label class="hall-pack">в коробке <input type="number" min="1" step="1" value="${coalPackSize(item)}" data-coal-pack="${item.id}"></label>`,
             }
           : {
               now: stockNow(item),
-              income: incomingQtyFor(item.name),
-              broken: fineQtyFor(item.name),
+              income: qtyInLoungeMonth(item.name),
+              broken: monthBrokenQty(item.name),
+              need: monthNeedQty(item),
               restockAttr: "data-restock",
               delAttr: "data-del-stock",
             })).join("") : `<p class="empty">Пока пусто</p>`}
@@ -2602,12 +2708,12 @@ $("#fineForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const what = data.what.trim();
-  markNeedBuy(what, data.qty);
+  const date = clampDateToMonth(data.date, toISODate(viewLoungeMonth));
   if (!Array.isArray(state.fines)) state.fines = [];
   state.fines.push({
     id: uid(),
     empId: data.empId,
-    date: data.date,
+    date,
     what,
     qty: Number(data.qty || 1),
     sum: Number(data.sum || 0),
@@ -2647,6 +2753,16 @@ $("#nextRevMonth")?.addEventListener("click", () => {
       : lastDayOfMonthISO(toISODate(viewRevMonth));
   }
   renderRevision();
+});
+
+$("#prevLoungeMonth")?.addEventListener("click", () => {
+  viewLoungeMonth = new Date(viewLoungeMonth.getFullYear(), viewLoungeMonth.getMonth() - 1, 1);
+  renderLounge();
+});
+
+$("#nextLoungeMonth")?.addEventListener("click", () => {
+  viewLoungeMonth = new Date(viewLoungeMonth.getFullYear(), viewLoungeMonth.getMonth() + 1, 1);
+  renderLounge();
 });
 
 $("#revisionDate").addEventListener("change", () => {
@@ -3425,6 +3541,15 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("input", (e) => {
+  const packId = e.target.dataset.coalPack;
+  if (packId) {
+    const item = ensureCoalStock().find((row) => row.id === packId);
+    if (!item) return;
+    item.perPack = Math.max(1, Number(e.target.value || DEFAULT_COALS_PER_PACK));
+    save();
+    renderLounge();
+    return;
+  }
   const stockId = e.target.dataset.stockStart;
   if (stockId) {
     const item = ensureInventory().find((row) => row.id === stockId);
