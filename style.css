@@ -995,21 +995,22 @@ input[type="number"] {
   height: 100%;
   max-width: none;
   margin: 0;
-  padding: 10px 14px 12px;
+  padding: 14px 18px 16px;
   background: #fff;
   color: #111;
   box-sizing: border-box;
   display: grid;
-  grid-template-rows: auto minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.7fr);
-  gap: 8px;
+  grid-template-rows: auto auto auto auto;
+  align-content: start;
+  gap: 14px;
 }
 
 .report-paper:not(:has(.report-split section)) {
-  grid-template-rows: auto minmax(0, 1.8fr) minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
 }
 
 .report-head {
-  padding-right: 84px;
+  padding-right: 96px;
 }
 
 .report-head h1 {
@@ -1036,70 +1037,69 @@ input[type="number"] {
   margin: 0;
   border-radius: 4px;
   min-height: 0;
-  height: 100%;
-  display: flex;
+  height: auto;
+  display: block;
 }
 
 .report-paper .roster,
 .report-paper .pay {
   table-layout: fixed;
   width: 100%;
-  height: 100%;
+  height: auto;
   min-width: 0;
   font-size: 12px;
 }
 
 .report-paper .roster thead,
 .report-paper .pay thead {
-  height: 26px;
+  height: auto;
 }
 
-.report-paper .roster tbody tr {
-  height: calc((100% - 26px) / var(--rows, 6));
-}
-
+.report-paper .roster tbody tr,
 .report-paper .pay tbody tr {
-  height: calc((100% - 26px) / var(--rows, 7));
+  height: auto;
 }
 
 .report-paper .roster th,
 .report-paper .roster td,
 .report-paper .pay th,
 .report-paper .pay td {
-  padding: 2px 4px;
+  padding: 6px 7px;
   height: auto;
-  line-height: 1.15;
+  line-height: 1.25;
 }
 
 .report-paper .roster th {
   min-width: 0;
-  height: 26px;
+  height: auto;
   font-size: 11px;
 }
 
 .report-paper .pay th {
-  padding: 3px 4px;
-  font-size: 10px;
+  padding: 7px 6px;
+  font-size: 11px;
   min-width: 0;
 }
 
 .report-paper .roster .name,
 .report-paper .pay .name {
   position: static;
-  min-width: 0;
+  min-width: 168px;
   max-width: none;
-  width: 15%;
-  padding: 1px 5px;
-  font-size: 11px;
-  line-height: 1.15;
+  width: 22%;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .report-paper .cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
-  height: 100%;
+  min-height: 28px;
+  height: auto;
+  padding: 4px 2px;
   font-size: 11px;
   white-space: nowrap;
   cursor: default;
@@ -1108,10 +1108,10 @@ input[type="number"] {
 .report-split {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 8px;
+  gap: 14px;
   min-height: 0;
-  height: 100%;
-  align-items: stretch;
+  height: auto;
+  align-items: start;
 }
 
 .report-split:empty {
@@ -1168,8 +1168,8 @@ input[type="number"] {
 }
 
 .report-split table {
-  flex: 1;
-  height: 100%;
+  flex: none;
+  height: auto;
 }
 
 .report-table {
@@ -1219,13 +1219,14 @@ body.report-open::before {
     transform: scale(calc(100vw / 1100));
     transform-origin: top left;
     display: grid;
-    grid-template-rows: auto minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.7fr);
-    padding: 10px 14px 12px;
-    gap: 8px;
+    grid-template-rows: auto auto auto auto;
+    align-content: start;
+    padding: 14px 18px 16px;
+    gap: 14px;
   }
 
   .report-paper:not(:has(.report-split section)) {
-    grid-template-rows: auto minmax(0, 1.8fr) minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
   }
 
   .report-bar {
