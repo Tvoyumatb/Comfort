@@ -1,4 +1,4 @@
-const APP_VERSION = "85";
+const APP_VERSION = "86";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1107,33 +1107,17 @@ function employeeById(id) {
   return (state.employees || []).find((emp) => emp.id === id);
 }
 
-function rememberGhostEmployees() {
-  if (!Array.isArray(state.employees)) state.employees = [];
-  const known = new Set(state.employees.map((emp) => emp.id));
-  let added = false;
-  const add = (id) => {
-    if (!id || known.has(id)) return;
-    known.add(id);
-    added = true;
-    state.employees.push({ id, name: "Бывший сотрудник", leftOn: "2000-01-01" });
-  };
-  Object.values(state.schedule || {}).forEach((day) => {
-    Object.keys(day || {}).forEach(add);
-  });
-  Object.values(state.extras || {}).forEach((period) => {
-    Object.keys(period || {}).forEach(add);
-  });
-  (state.fines || []).forEach((f) => add(f.empId));
-  if (added) save();
-}
-
 function empHasPeriodWork(emp) {
   return periodDays().some((date) => state.schedule[toISODate(date)]?.[emp.id]);
 }
 
 function visibleEmployees() {
-  rememberGhostEmployees();
-  return (state.employees || []).filter((emp) => !emp.leftOn || empHasPeriodWork(emp));
+  const people = (state.employees || []).filter((emp) => emp.name !== "Бывший сотрудник");
+  if (people.length !== (state.employees || []).length) {
+    state.employees = people;
+    save();
+  }
+  return people.filter((emp) => !emp.leftOn || empHasPeriodWork(emp));
 }
 
 function activeEmployees() {
@@ -1152,7 +1136,7 @@ function renderRoster() {
   const body = people.map((emp) => `
     <tr>
       <th class="name">
-        ${escapeHtml(emp.name)}${emp.leftOn ? " <small>ушёл</small>" : ""}
+        ${escapeHtml(emp.name)}
         ${emp.leftOn ? "" : `<button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>`}
       </th>
       ${days.map((date) => {

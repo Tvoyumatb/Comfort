@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v85 archive staff and scroll stock
+  // v86 drop former-staff labels
   event.waitUntil(self.skipWaiting());
 });
 
