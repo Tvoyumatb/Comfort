@@ -1,4 +1,4 @@
-const APP_VERSION = "83";
+const APP_VERSION = "84";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -2346,7 +2346,7 @@ function renderStockRows(items, { restockAttr, startAttr, delAttr, extraCols, co
     const extra = extraCols(item);
     const now = extra.now;
     return `
-      <tr class="${now <= 2 || extra.watch ? "low-stock" : ""}">
+      <tr class="${extra.watch ? "low-stock" : ""}">
         <th class="name">${escapeHtml(item.name)}</th>
         <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" ${startAttr}="${item.id}"></td>
         ${extra.mid}
@@ -2471,7 +2471,7 @@ function renderInventoryStock() {
       <input type="text" name="name" placeholder="Добавить название угля" required>
       <button type="submit" class="primary compact">+</button>
     </form>
-    <p class="hint">Сейчас = изначально + приход − порча. Мундштуки — пачками.</p>
+    <p class="hint">«Изначально» — сколько было на старте. Сейчас = изначально + приход − порча. Красным только то, что сломали, пока не нажмёшь +.</p>
   `;
 }
 
@@ -3437,8 +3437,10 @@ document.addEventListener("input", (e) => {
     if (!item) return;
     item.start = Number(e.target.value || 0);
     save();
-    const cell = e.target.closest("tr")?.querySelector(".sum");
+    const row = e.target.closest("tr");
+    const cell = row?.querySelector(".sum");
     if (cell) cell.textContent = `${stockNow(item)} ${stockUnit(item)}`;
+    row?.classList.toggle("low-stock", stockNeedsBuy(item));
     renderLoungeAlerts();
     return;
   }

@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v83 plus next to broken items
+  // v84 red only after damage
   event.waitUntil(self.skipWaiting());
 });
 
