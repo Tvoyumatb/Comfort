@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "89";
+      var BUILD = "90";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -295,38 +295,39 @@
     <section id="lounge" class="panel" role="tabpanel" hidden>
       <div class="period-bar">
         <p class="period-label">
-          <strong>Кальянная</strong>
-          <span>Остатки зала, порча и что нужно закупить</span>
+          <strong>Зал</strong>
+          <span>Сломали — сверху. Что пришло — на карточках.</span>
         </p>
       </div>
       <div id="loungeAlerts"></div>
-      <p class="hint">Изначально — сколько стояло на старте, это плюсуется в «Сейчас». Красным только порча. Плюс рядом — закупил и вернул.</p>
-      <div id="inventoryStock"></div>
-      <h2 class="block-title">Порча</h2>
-      <form class="card form" id="fineForm">
-        <label>Сотрудник
-          <select name="empId" id="fineEmpSelect" required></select>
-        </label>
-        <label>Что испортили
-          <input type="text" name="what" list="fineWhatList" placeholder="Колба, чаша..." required>
-        </label>
-        <datalist id="fineWhatList"></datalist>
-        <label>Дата
-          <span class="date-wrap">
-            <input type="date" name="date" required>
-          </span>
-        </label>
+      <h2 class="block-title">Сломали</h2>
+      <form class="card form hall-fine" id="fineForm">
         <div class="row">
-          <label>Штук
+          <label>Кто
+            <select name="empId" id="fineEmpSelect" required></select>
+          </label>
+          <label>Что
+            <input type="text" name="what" list="fineWhatList" placeholder="Чаша, колба" required>
+          </label>
+        </div>
+        <datalist id="fineWhatList"></datalist>
+        <div class="row">
+          <label>Дата
+            <span class="date-wrap">
+              <input type="date" name="date" required>
+            </span>
+          </label>
+          <label>Шт
             <input type="number" name="qty" min="1" step="1" value="1" required>
           </label>
           <label>Сумма
             <input type="number" name="sum" min="0" step="1000" required>
           </label>
         </div>
-        <button type="submit" class="primary">Добавить порчу</button>
+        <button type="submit" class="primary">Записать</button>
       </form>
-      <div class="list" id="fineList"></div>
+      <div class="list hall-fines" id="fineList"></div>
+      <div id="inventoryStock"></div>
     </section>
 
     <section id="checklist" class="panel" role="tabpanel" hidden>
