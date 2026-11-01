@@ -1327,6 +1327,18 @@ function renderReport() {
 
     <div class="report-split">${lateTable}${damageTable}</div>
   `;
+  requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
+}
+
+function fitReportPaper() {
+  const paper = $("#reportPaper");
+  const frame = paper?.closest(".report-frame");
+  if (!paper || !frame || $("#reportView")?.hidden) return;
+  paper.style.transform = "none";
+  const width = Math.max(paper.scrollWidth, paper.offsetWidth, 1);
+  const height = Math.max(paper.scrollHeight, paper.offsetHeight, 1);
+  const scale = Math.min(frame.clientWidth / width, frame.clientHeight / height, 1);
+  paper.style.transform = scale < 0.999 ? `scale(${scale})` : "none";
 }
 
 function openReport() {
@@ -1334,6 +1346,7 @@ function openReport() {
   const view = $("#reportView");
   if (view) view.hidden = false;
   document.body.classList.add("report-open");
+  requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
 
 function closeReport() {
@@ -2924,6 +2937,12 @@ $("#importFile")?.addEventListener("change", (e) => {
 
 $("#reportBtn")?.addEventListener("click", () => openReport());
 $("#reportClose")?.addEventListener("click", () => closeReport());
+window.addEventListener("resize", () => {
+  if (!$("#reportView")?.hidden) fitReportPaper();
+});
+window.addEventListener("orientationchange", () => {
+  setTimeout(fitReportPaper, 250);
+});
 
 $("#printBtn").addEventListener("click", () => {
   const tab = document.querySelector(".tab.is-active")?.dataset.tab;
@@ -2942,9 +2961,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "62") {
+  if (localStorage.getItem("journal-sw") !== "63") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "62");
+    localStorage.setItem("journal-sw", "63");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();

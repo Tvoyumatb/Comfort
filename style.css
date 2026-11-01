@@ -970,7 +970,9 @@ input[type="number"] {
 }
 
 .report-frame {
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
 }
 
 .report-bar {
@@ -992,17 +994,19 @@ input[type="number"] {
 }
 
 .report-paper {
-  height: 100%;
+  width: 100%;
+  height: auto;
   max-width: none;
   margin: 0;
-  padding: 14px 18px 16px;
+  padding: 12px 16px 14px;
   background: #fff;
   color: #111;
   box-sizing: border-box;
   display: grid;
   grid-template-rows: auto auto auto auto;
   align-content: start;
-  gap: 14px;
+  gap: 10px;
+  transform-origin: top left;
 }
 
 .report-paper:not(:has(.report-split section)) {
@@ -1206,27 +1210,17 @@ body.report-open::before {
   }
 
   .report-frame {
-    width: 100vw;
-    height: calc(100vw * 0.66);
-    margin-top: 36px;
+    inset: 0 0 76px;
+    width: auto;
+    height: auto;
+    margin: 0;
     overflow: hidden;
   }
 
   .report-paper {
-    --report-w: 1100px;
-    width: var(--report-w);
-    height: calc(var(--report-w) * 0.66);
-    transform: scale(calc(100vw / 1100));
-    transform-origin: top left;
-    display: grid;
-    grid-template-rows: auto auto auto auto;
-    align-content: start;
-    padding: 14px 18px 16px;
-    gap: 14px;
-  }
-
-  .report-paper:not(:has(.report-split section)) {
-    grid-template-rows: auto auto auto;
+    width: 100%;
+    height: auto;
+    transform: none;
   }
 
   .report-bar {
@@ -1480,6 +1474,7 @@ body.report-open::before {
   }
 
   body.print-report .report-frame {
+    position: static;
     height: auto;
     overflow: visible;
   }
@@ -1490,6 +1485,6 @@ body.report-open::before {
     min-height: 0;
     padding: 0;
     display: block;
-    transform: none;
+    transform: none !important;
   }
 }
