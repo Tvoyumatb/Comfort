@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v79 portrait and landscape reports
+  // v80 native layout per report kind
   event.waitUntil(self.skipWaiting());
 });
 

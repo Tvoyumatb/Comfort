@@ -1,4 +1,4 @@
-const APP_VERSION = "79";
+const APP_VERSION = "80";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1364,12 +1364,25 @@ function fitReportPaper() {
   const frame = paper?.closest(".report-frame");
   if (!paper || !frame || $("#reportView")?.hidden) return;
   syncReportOrientation();
+  const landscape = window.matchMedia("(orientation: landscape)").matches;
   paper.style.transform = "none";
-  paper.style.width = `${frame.clientWidth}px`;
+  paper.style.maxWidth = "none";
+  if (reportKind === "revision") {
+    const native = Math.min(440, landscape ? 440 : frame.clientWidth);
+    paper.style.width = `${native}px`;
+    paper.style.minWidth = `${native}px`;
+  } else {
+    const native = landscape ? frame.clientWidth : 900;
+    paper.style.width = `${native}px`;
+    paper.style.minWidth = `${native}px`;
+  }
   const width = Math.max(paper.scrollWidth, paper.offsetWidth, 1);
   const height = Math.max(paper.scrollHeight, paper.offsetHeight, 1);
   const scale = Math.min(frame.clientWidth / width, frame.clientHeight / height, 1);
-  paper.style.transform = scale < 0.999 ? `scale(${scale})` : "none";
+  const x = Math.max(0, (frame.clientWidth - width * scale) / 2);
+  const y = Math.max(0, (frame.clientHeight - height * scale) / 2);
+  paper.style.transformOrigin = "top left";
+  paper.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
 }
 
 function openReport() {

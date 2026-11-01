@@ -1156,16 +1156,13 @@ input[type="number"] {
 }
 
 .report-paper.rev-shot {
-  width: 100%;
-  min-height: 100%;
-  padding:
-    max(10px, env(safe-area-inset-top))
-    max(12px, env(safe-area-inset-right))
-    max(10px, env(safe-area-inset-bottom))
-    max(12px, env(safe-area-inset-left));
+  width: 440px;
+  max-width: 440px;
+  min-height: 0;
+  padding: 12px 12px 14px;
   gap: 8px;
-  grid-template-rows: auto 1fr auto;
-  align-content: stretch;
+  grid-template-rows: auto auto auto;
+  align-content: start;
 }
 
 .report-paper.rev-shot .report-head {
@@ -1287,7 +1284,7 @@ input[type="number"] {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  grid-template-columns: minmax(0, 7.6em) repeat(var(--days, 15), minmax(0, 1fr));
+  grid-template-columns: minmax(110px, 8.4em) repeat(var(--days, 15), minmax(36px, 1fr));
   background: #fff;
   border-top: 1px solid #b4b4b4;
   border-left: 1px solid #b4b4b4;
@@ -1521,68 +1518,10 @@ body.report-open::before {
     overflow: hidden;
   }
 
-  .report-paper {
-    width: 100%;
-    padding:
-      max(10px, env(safe-area-inset-top))
-      max(12px, env(safe-area-inset-right))
-      max(10px, env(safe-area-inset-bottom))
-      max(12px, env(safe-area-inset-left));
-  }
-
-  .report-paper .report-pay,
-  .report-paper .pay {
-    width: 100%;
+  .report-paper:not(.rev-shot) .report-pay,
+  .report-paper:not(.rev-shot) .pay {
+    width: max-content;
     max-width: 100%;
-    table-layout: fixed;
-  }
-
-  .report-split {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-}
-
-@media (orientation: portrait) and (max-width: 500px) {
-  .report-head h1 {
-    font-size: 15px;
-  }
-
-  .report-rates {
-    font-size: 10px;
-  }
-
-  .report-timesheet {
-    grid-template-columns: minmax(0, 5.4em) repeat(var(--days, 15), minmax(0, 1fr));
-    font-size: 10px;
-  }
-
-  .report-timesheet .rt-head,
-  .report-timesheet .rt-name {
-    padding: 4px 4px;
-    font-size: 10px;
-  }
-
-  .report-timesheet .rt-shift,
-  .report-paper .report-timesheet .rt-shift.cell {
-    min-height: 22px;
-    font-size: 9px;
-    padding: 2px 0;
-  }
-
-  .report-paper .pay th,
-  .report-paper .pay td {
-    padding: 5px 4px;
-    font-size: 10px;
-  }
-
-  .report-split {
-    grid-template-columns: 1fr;
-  }
-
-  .rev-shot-sheet th,
-  .rev-shot-sheet td {
-    padding: 5px 6px;
   }
 }
 
@@ -1598,64 +1537,19 @@ body.report-open::before {
     font-size: 12px;
   }
 
-  .report-paper {
+  .report-paper:not(.rev-shot) {
     gap: 6px;
     padding-top: 8px;
     padding-bottom: max(8px, env(safe-area-inset-bottom));
   }
 
-  .report-head {
+  .report-paper:not(.rev-shot) .report-head {
     padding-right: 88px;
-  }
-
-  .report-head h1 {
-    font-size: 14px;
-  }
-
-  .report-rates {
-    font-size: 10px;
-  }
-
-  .report-timesheet {
-    grid-template-columns: minmax(0, 8.2em) repeat(var(--days, 15), minmax(0, 1fr));
-    font-size: 11px;
   }
 
   .report-timesheet .rt-shift,
   .report-paper .report-timesheet .rt-shift.cell {
-    min-height: 22px;
-    font-size: 10px;
-  }
-
-  .report-paper .pay th,
-  .report-paper .pay td {
-    padding: 4px 6px;
-    font-size: 10px;
-  }
-
-  .rev-shot-cols {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 10px;
-    align-items: start;
-  }
-
-  .report-paper.rev-shot {
-    gap: 6px;
-    padding-right: max(88px, env(safe-area-inset-right));
-  }
-
-  .rev-shot-sheet {
-    font-size: 11px;
-  }
-
-  .rev-shot-sheet th,
-  .rev-shot-sheet td {
-    padding: 3px 6px;
-  }
-
-  .rev-shot-foot {
-    grid-column: 1 / -1;
+    min-height: 24px;
   }
 }
 
