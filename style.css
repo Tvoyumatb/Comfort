@@ -969,6 +969,10 @@ input[type="number"] {
   color: #111;
 }
 
+.report-frame {
+  height: 100%;
+}
+
 .report-bar {
   position: fixed;
   top: 6px;
@@ -1189,67 +1193,39 @@ body.report-open::before {
   display: none;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 820px) and (orientation: portrait) {
   .report-view {
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
+    background: #fff;
   }
 
   html:has(body.report-open),
   body.report-open {
-    height: auto;
-    min-height: 100%;
-    overflow: auto;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .report-frame {
+    width: 100vw;
+    height: calc(100vw * 0.66);
+    margin-top: 36px;
+    overflow: hidden;
   }
 
   .report-paper {
-    height: auto;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    padding: 10px 8px calc(20px + env(safe-area-inset-bottom));
-    gap: 10px;
+    --report-w: 1100px;
+    width: var(--report-w);
+    height: calc(var(--report-w) * 0.66);
+    transform: scale(calc(100vw / 1100));
+    transform-origin: top left;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.7fr);
+    padding: 10px 14px 12px;
+    gap: 8px;
   }
 
-  .report-paper .excel-card {
-    height: auto;
-    overflow: auto;
-  }
-
-  .report-paper .roster,
-  .report-paper .pay {
-    height: auto;
-    font-size: 10px;
-  }
-
-  .report-paper .roster thead,
-  .report-paper .pay thead,
-  .report-paper .roster tbody tr,
-  .report-paper .pay tbody tr {
-    height: auto;
-  }
-
-  .report-paper .cell {
-    min-height: 22px;
-    height: auto;
-    font-size: 9px;
-  }
-
-  .report-paper .roster .name,
-  .report-paper .pay .name {
-    width: 30%;
-    font-size: 10px;
-    white-space: normal;
-  }
-
-  .report-split {
-    height: auto;
-    grid-template-columns: 1fr;
-  }
-
-  .report-split table {
-    height: auto;
-    flex: none;
+  .report-paper:not(:has(.report-split section)) {
+    grid-template-rows: auto minmax(0, 1.8fr) minmax(0, 1fr);
   }
 }
 
@@ -1481,11 +1457,17 @@ body.report-open::before {
     overflow: visible;
   }
 
+  body.print-report .report-frame {
+    height: auto;
+    overflow: visible;
+  }
+
   body.print-report .report-paper {
     max-width: none;
     height: auto;
     min-height: 0;
     padding: 0;
     display: block;
+    transform: none;
   }
 }
