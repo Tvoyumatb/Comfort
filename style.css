@@ -40,6 +40,7 @@ html, body {
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
   touch-action: manipulation;
+  overscroll-behavior-y: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-user-select: none;
@@ -143,6 +144,29 @@ body[data-venue="shishka"]::before {
 #reloadBtn {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.pull-refresh {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 35;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+  padding-bottom: 8px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent);
+}
+
+.pull-refresh.is-ready {
+  color: var(--text);
 }
 
 .update-banner {
