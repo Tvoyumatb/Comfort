@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v84 red only after damage
+  // v85 archive staff and scroll stock
   event.waitUntil(self.skipWaiting());
 });
 

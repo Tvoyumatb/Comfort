@@ -1,4 +1,4 @@
-const APP_VERSION = "84";
+const APP_VERSION = "85";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1103,19 +1103,57 @@ function renderRates() {
   `;
 }
 
+function employeeById(id) {
+  return (state.employees || []).find((emp) => emp.id === id);
+}
+
+function rememberGhostEmployees() {
+  if (!Array.isArray(state.employees)) state.employees = [];
+  const known = new Set(state.employees.map((emp) => emp.id));
+  let added = false;
+  const add = (id) => {
+    if (!id || known.has(id)) return;
+    known.add(id);
+    added = true;
+    state.employees.push({ id, name: "Бывший сотрудник", leftOn: "2000-01-01" });
+  };
+  Object.values(state.schedule || {}).forEach((day) => {
+    Object.keys(day || {}).forEach(add);
+  });
+  Object.values(state.extras || {}).forEach((period) => {
+    Object.keys(period || {}).forEach(add);
+  });
+  (state.fines || []).forEach((f) => add(f.empId));
+  if (added) save();
+}
+
+function empHasPeriodWork(emp) {
+  return periodDays().some((date) => state.schedule[toISODate(date)]?.[emp.id]);
+}
+
+function visibleEmployees() {
+  rememberGhostEmployees();
+  return (state.employees || []).filter((emp) => !emp.leftOn || empHasPeriodWork(emp));
+}
+
+function activeEmployees() {
+  return (state.employees || []).filter((emp) => !emp.leftOn);
+}
+
 function renderRoster() {
   const days = periodDays();
+  const people = visibleEmployees();
   const head = `
     <tr>
       <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
       ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
     </tr>
   `;
-  const body = state.employees.map((emp) => `
+  const body = people.map((emp) => `
     <tr>
       <th class="name">
-        ${escapeHtml(emp.name)}
-        <button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>
+        ${escapeHtml(emp.name)}${emp.leftOn ? " <small>ушёл</small>" : ""}
+        ${emp.leftOn ? "" : `<button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>`}
       </th>
       ${days.map((date) => {
         const iso = toISODate(date);
@@ -1130,7 +1168,7 @@ function renderRoster() {
 }
 
 function renderPay() {
-  const rows = state.employees.map((emp) => {
+  const rows = visibleEmployees().map((emp) => {
     const c = countShifts(emp.id);
     const extra = extrasFor(emp.id);
     return `
@@ -1174,7 +1212,7 @@ function renderFines() {
     .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const empSelect = $("#fineEmpSelect");
   if (empSelect) {
-    empSelect.innerHTML = state.employees
+    empSelect.innerHTML = activeEmployees()
       .map((emp) => `<option value="${emp.id}">${escapeHtml(emp.name)}</option>`)
       .join("");
   }
@@ -1189,7 +1227,7 @@ function renderFines() {
     return;
   }
   list.innerHTML = rows.map((f) => {
-    const emp = state.employees.find((e) => e.id === f.empId);
+    const emp = employeeById(f.empId);
     return `
       <article class="card item">
         <div class="item-head">
@@ -1227,7 +1265,7 @@ function renderReport() {
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
-    ...state.employees.flatMap((emp) => [
+    ...visibleEmployees().flatMap((emp) => [
       `<div class="rt-name">${nameHtml(emp.name)}</div>`,
       ...days.map((date) => {
         const type = state.schedule[toISODate(date)]?.[emp.id] || "";
@@ -1237,7 +1275,7 @@ function renderReport() {
     ]),
   ].join("");
 
-  const payRows = state.employees.map((emp) => {
+  const payRows = visibleEmployees().map((emp) => {
     const c = countShifts(emp.id);
     const extra = extrasFor(emp.id);
     return `
@@ -1254,7 +1292,7 @@ function renderReport() {
     `;
   }).join("");
 
-  const lateFines = state.employees
+  const lateFines = visibleEmployees()
     .map((emp) => ({ name: emp.name, sum: Number(extrasFor(emp.id).fines || 0) }))
     .filter((row) => row.sum > 0);
   const damages = (state.fines || [])
@@ -1262,7 +1300,7 @@ function renderReport() {
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   const lateTotal = lateFines.reduce((sum, row) => sum + row.sum, 0);
   const damageSum = damages.reduce((sum, f) => sum + Number(f.sum || 0), 0);
-  const advanceTotal = state.employees.reduce((sum, emp) => sum + Number(extrasFor(emp.id).advances || 0), 0);
+  const advanceTotal = visibleEmployees().reduce((sum, emp) => sum + Number(extrasFor(emp.id).advances || 0), 0);
 
   const lateTable = lateFines.length
     ? `<section class="report-fines">
@@ -1292,7 +1330,7 @@ function renderReport() {
           </thead>
           <tbody>
             ${damages.map((f) => {
-              const emp = state.employees.find((e) => e.id === f.empId);
+              const emp = employeeById(f.empId);
               return `<tr>
                 <td>${parseISODate(f.date).toLocaleDateString("ru-RU")}</td>
                 <th class="name">${escapeHtml(emp?.name || "Сотрудник")}</th>
@@ -2405,7 +2443,7 @@ function renderInventoryStock() {
   };
   const table = (title, items, placeholder, kind) => `
     <h2 class="block-title">${title}</h2>
-    <div class="excel-card">
+    <div class="excel-card stock-wrap">
       <table class="pay stock-table">
         <thead>
           <tr>
@@ -2437,7 +2475,7 @@ function renderInventoryStock() {
     ${table("Чаши", bowls, "Название чаши, например Solaris", "bowl")}
     ${table("Инвентарь зала", rest, "Добавить позицию, например колба", "item")}
     <h2 class="block-title">Виды угля</h2>
-    <div class="excel-card">
+    <div class="excel-card stock-wrap">
       <table class="pay stock-table">
         <thead>
           <tr>
@@ -2579,8 +2617,8 @@ $("#rosterWrap").addEventListener("click", (e) => {
   const del = e.target.closest("[data-del-emp]");
   if (del) {
     const emp = state.employees.find((row) => row.id === del.dataset.delEmp);
-    if (!emp || !window.confirm(`Удалить ${emp.name} из табеля?`)) return;
-    state.employees = state.employees.filter((row) => row.id !== del.dataset.delEmp);
+    if (!emp || !window.confirm(`Убрать ${emp.name} из текущего табеля? Старые смены сохранятся.`)) return;
+    emp.leftOn = todayISO();
     save();
     renderShifts();
   }

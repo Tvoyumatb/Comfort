@@ -50,8 +50,10 @@ html, body {
 }
 
 body {
-  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  padding-bottom: max(48px, env(safe-area-inset-bottom));
   overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   background-color: #070707;
 }
 
@@ -988,6 +990,30 @@ input[type="number"] {
   margin-bottom: 12px;
 }
 
+.excel-card.stock-wrap,
+.stock-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.stock-table {
+  min-width: 560px;
+}
+
+.stock-table .name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.stock-table input {
+  min-width: 56px;
+  max-width: 88px;
+}
+
 .roster-wrap, .pay-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -1626,7 +1652,8 @@ body.report-open::before {
 }
 
 .stock-table input {
-  min-width: 64px;
+  min-width: 56px;
+  max-width: 88px;
 }
 
 .stock-table .restock {
