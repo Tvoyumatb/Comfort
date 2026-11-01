@@ -1,5 +1,6 @@
-const APP_VERSION = "68";
-const APP_NOTES = "Вернул смены, приход и сотрудников. Обновление больше не затирает журнал.";
+const APP_VERSION = "69";
+const APP_NOTES = "Вернул табель, приход Rotana и сотрудников. Журнал больше не затирается пустой копией.";
+const RESTORE_URL = "./journal-restore.json?v=69";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -572,16 +573,7 @@ function dbFill(raw) {
 
 function shouldUseRemote(remote, local) {
   if (!remote?.venues) return false;
-  const rt = Number(remote.updatedAt || 0);
-  const lt = Number(local?.updatedAt || 0);
-  const rf = dbFill(remote);
-  const lf = dbFill(local);
-  if (rf === 0 && lf > 0) return false;
-  if (lf === 0 && rf > 0) return true;
-  if (rf < lf * 0.6) return false;
-  if (rt > lt) return true;
-  if (rt === lt && rf > lf) return true;
-  return false;
+  return dbFill(remote) > dbFill(local);
 }
 
 function applyCloud(raw) {
@@ -738,6 +730,10 @@ function liveMqttSockets() {
 }
 
 function pushCloud() {
+  if (lastRemote && dbFill(db) < dbFill(lastRemote)) {
+    setSyncStatus("На устройстве меньше данных — облако не трогаю");
+    return false;
+  }
   const open = liveMqttSockets();
   if (!open.length) {
     setSyncStatus("Нет сети — пока только на этом устройстве");
@@ -749,6 +745,21 @@ function pushCloud() {
   open.forEach((ws) => ws.send(packet));
   setSyncStatus("Сохранено на телефон и ноут");
   return true;
+}
+
+async function loadRestoreCopy() {
+  try {
+    const res = await fetch(RESTORE_URL, { cache: "no-store" });
+    if (!res.ok) return null;
+    return asJournal(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+function pickRicher(a, b) {
+  if (b && dbFill(b) > dbFill(a)) return b;
+  return a;
 }
 
 function queueCloudPush() {
@@ -822,6 +833,10 @@ function startMqttPing() {
 async function bootCloud() {
   navigator.storage?.persist?.().catch(() => {});
   setSyncStatus("Загружаю общие данные…");
+  const backup = await loadRestoreCopy();
+  if (shouldUseRemote(backup, db)) {
+    applyRemote(backup, "Вернул сохранённый журнал");
+  }
   mqttConnectAll();
   startMqttPing();
   const started = Date.now();
@@ -830,13 +845,13 @@ async function bootCloud() {
   }
   cloudReady = true;
   await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  const richest = pickRicher(pickRicher(packedDb(), lastRemote), backup);
+  if (shouldUseRemote(richest, db)) {
+    applyRemote(richest, "Вернул сохранённый журнал");
+  }
   if (!liveMqttSockets().length) {
     setSyncStatus("Нет сети — пока только на этом устройстве");
-  } else if (
-    !lastRemote
-    || Number(db.updatedAt || 0) > Number(lastRemote.updatedAt || 0)
-    || dbFill(db) > dbFill(lastRemote)
-  ) {
+  } else if (dbFill(db) >= dbFill(lastRemote || {})) {
     pushCloud();
   } else {
     setSyncStatus("Данные с телефона и ноута");
@@ -845,9 +860,14 @@ async function bootCloud() {
     if (document.visibilityState === "visible") mqttConnectAll();
   });
   window.addEventListener("online", () => mqttConnectAll());
-  $("#syncStatus")?.addEventListener("click", () => {
+  $("#syncStatus")?.addEventListener("click", async () => {
     setSyncStatus("Обновляю…");
+    const copy = await loadRestoreCopy();
+    if (shouldUseRemote(copy, db)) applyRemote(copy, "Вернул сохранённый журнал");
     mqttConnectAll();
+    if (lastRemote && shouldUseRemote(lastRemote, db)) {
+      applyRemote(lastRemote, "Подтянул свежие данные");
+    }
     pushCloud();
   });
 }

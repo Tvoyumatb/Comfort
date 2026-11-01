@@ -1,4 +1,4 @@
-const CACHE = "journal-v68";
+const CACHE = "journal-v69";
 const FILES = [
   "./wallpaper-tangiers.jpg",
   "./tangiers-logo.png",
@@ -27,7 +27,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request));
     return;
   }
-  const live = /\.(?:js|css|html|webmanifest)$/.test(url.pathname) || url.pathname.endsWith("/");
+  const live = /\.(?:js|css|html|json|webmanifest)$/.test(url.pathname) || url.pathname.endsWith("/");
   if (live) {
     event.respondWith(
       fetch(event.request, { cache: "no-store" }).catch(() => caches.match(event.request))
