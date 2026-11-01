@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v77 revision screenshot
+  // v78 pro max revision sheet
   event.waitUntil(self.skipWaiting());
 });
 

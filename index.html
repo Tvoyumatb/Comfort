@@ -39,11 +39,11 @@
       }
       var css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = "style.css?v=77&n=" + params.get("n");
+      css.href = "style.css?v=78&n=" + params.get("n");
       document.head.appendChild(css);
       window.addEventListener("DOMContentLoaded", function () {
         var script = document.createElement("script");
-        script.src = "app.js?v=77&n=" + params.get("n");
+        script.src = "app.js?v=78&n=" + params.get("n");
         document.body.appendChild(script);
       });
     })();

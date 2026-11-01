@@ -1084,8 +1084,8 @@ input[type="number"] {
 
 .report-bar {
   position: fixed;
-  top: 6px;
-  right: 8px;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
   z-index: 80;
   padding: 0;
   background: transparent;
@@ -1093,8 +1093,11 @@ input[type="number"] {
 }
 
 .report-bar .ghost {
-  padding: 4px 10px;
-  font-size: 12px;
+  width: auto;
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
   color: #111;
   border: 1px solid #777;
   background: #fff;
@@ -1153,74 +1156,112 @@ input[type="number"] {
 }
 
 .report-paper.rev-shot {
-  grid-template-rows: auto auto auto;
+  width: 100%;
+  min-height: 100%;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   gap: 8px;
+  grid-template-rows: auto 1fr auto;
+  align-content: stretch;
 }
 
-.rev-shot-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  align-items: start;
-  min-width: 0;
+.report-paper.rev-shot .report-head {
+  padding-right: 72px;
+}
+
+.report-paper.rev-shot .report-head h1 {
+  font-size: 15px;
+  letter-spacing: -0.02em;
 }
 
 .rev-shot-empty {
-  grid-column: 1 / -1;
   margin: 0;
-  padding: 10px;
+  padding: 12px 4px;
   color: #333;
   font-size: 13px;
 }
 
-.rev-shot-block {
-  min-width: 0;
-}
-
-.rev-shot-block h2 {
-  margin: 0;
-  padding: 5px 8px;
+.rev-shot-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
   font-size: 12px;
-  background: #f3f3f3;
-  border-bottom: 1px solid #bbb;
+  line-height: 1.2;
+  background: #fff;
 }
 
-.rev-shot-block h2 small {
+.rev-shot-sheet col.num {
+  width: 68px;
+}
+
+.rev-shot-sheet th,
+.rev-shot-sheet td {
+  border: 1px solid #c8c8c8;
+  padding: 5px 7px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.rev-shot-sheet thead th {
+  background: #f3f3f3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rev-shot-sheet .name {
+  text-align: left;
+  font-weight: 600;
+}
+
+.rev-shot-sheet td:nth-child(2),
+.rev-shot-sheet td:nth-child(3),
+.rev-shot-sheet td:nth-child(4),
+.rev-shot-sheet th:nth-child(2),
+.rev-shot-sheet th:nth-child(3),
+.rev-shot-sheet th:nth-child(4),
+.rev-shot-sheet .rev-sum td {
+  text-align: right;
+}
+
+.rev-shot-sheet .rev-g th {
+  text-align: left;
+  padding: 5px 7px;
+  font-size: 12px;
+}
+
+.rev-shot-sheet .rev-g small {
   font-weight: 600;
   color: #444;
 }
 
-.rev-shot-block.group-classic h2 { background: #fff6c2; }
-.rev-shot-block.group-premium h2 { background: #f1e4ff; }
-.rev-shot-block.group-fruit h2 { background: #dff7ea; }
-.rev-shot-block.group-tangiers h2 { background: #ffe0d2; }
+.rev-shot-sheet .rev-g.group-classic th { background: #fff6c2; }
+.rev-shot-sheet .rev-g.group-premium th { background: #f1e4ff; }
+.rev-shot-sheet .rev-g.group-fruit th { background: #dff7ea; }
+.rev-shot-sheet .rev-g.group-tangiers th { background: #ffe0d2; }
 
-.rev-shot-table {
-  width: 100%;
-  table-layout: fixed;
+.rev-shot-sheet .rev-sum th,
+.rev-shot-sheet .rev-sum td {
+  background: #f7f7f7;
+  font-weight: 700;
 }
 
-.rev-shot-table .name {
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.rev-shot-foot {
+  margin-top: 0;
 }
 
-.rev-shot-table th:nth-child(2),
-.rev-shot-table td:nth-child(2),
-.rev-shot-table th:nth-child(3),
-.rev-shot-table td:nth-child(3) {
-  width: 22%;
-  text-align: right;
+.rev-shot-foot col.num {
+  width: 25%;
 }
 
-.rev-shot-totals {
-  width: 100%;
-  max-width: none;
+.report-paper.rev-shot.is-dense .rev-shot-sheet {
+  font-size: 11px;
 }
 
-.rev-shot-totals .pay {
-  width: 100%;
+.report-paper.rev-shot.is-dense .rev-shot-sheet th,
+.report-paper.rev-shot.is-dense .rev-shot-sheet td {
+  padding: 3px 6px;
 }
 
 .report-paper .roster,
@@ -1476,7 +1517,7 @@ body.report-open::before {
   }
 
   .report-frame {
-    inset: 0 0 76px;
+    inset: 0;
     width: auto;
     height: auto;
     margin: 0;
@@ -1485,29 +1526,12 @@ body.report-open::before {
 
   .report-paper {
     width: 100%;
+    max-width: 440px;
     height: auto;
-    transform: none;
   }
 
-  .report-bar {
-    top: auto;
-    right: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 80;
-    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
-    background: #fff;
-  }
-
-  .report-bar .ghost {
-    display: block;
-    width: 100%;
-    padding: 14px 12px;
-    font-size: 16px;
-    font-weight: 700;
-    color: #111;
-    border: 1px solid #111;
-    background: #fff;
+  .report-paper.rev-shot {
+    max-width: none;
   }
 }
 

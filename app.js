@@ -1,4 +1,4 @@
-const APP_VERSION = "77";
+const APP_VERSION = "78";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1358,6 +1358,7 @@ function fitReportPaper() {
   const frame = paper?.closest(".report-frame");
   if (!paper || !frame || $("#reportView")?.hidden) return;
   paper.style.transform = "none";
+  paper.style.width = `${frame.clientWidth}px`;
   const width = Math.max(paper.scrollWidth, paper.offsetWidth, 1);
   const height = Math.max(paper.scrollHeight, paper.offsetHeight, 1);
   const scale = Math.min(frame.clientWidth / width, frame.clientHeight / height, 1);
@@ -1402,30 +1403,30 @@ function renderRevisionReport() {
   const prev = prevMonthRevision(rev.date);
   const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
   const { month, snap } = revisionReportLabel(rev);
-  const groupCards = groups.map((group) => {
+  let itemCount = 0;
+  const body = groups.map((group) => {
     const rows = (rev.items || []).filter((item) => itemGroup(item) === group.id);
     if (!rows.length) return "";
+    itemCount += rows.length;
     const used = prev ? usedGramsForGroup(rev, group.id, rev.date) : null;
     const sum = rows.reduce((n, item) => n + Number(item.grams || 0), 0);
-    const body = rows.map((item) => {
+    const usedSum = rows.reduce((n, item) => n + (prev ? usedGramsForItem(rev, item, rev.date) : 0), 0);
+    const list = rows.map((item) => {
       const delta = prev ? usedGramsForItem(rev, item, rev.date) : null;
       return `<tr>
-        <th class="name">${escapeHtml(item.name)}</th>
+        <td class="name">${escapeHtml(item.name)}</td>
         <td>${formatGrams(item.grams)}</td>
         <td>${delta == null ? "—" : formatGrams(delta)}</td>
       </tr>`;
     }).join("");
     return `
-      <section class="excel-card rev-shot-block group-${group.id}">
-        <h2>${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</h2>
-        <table class="pay rev-shot-table">
-          <thead><tr><th class="name">Марка</th><th>г</th><th>−</th></tr></thead>
-          <tbody>
-            ${body}
-            <tr><th class="name">Итого</th><td class="sum">${formatGrams(sum)}</td><td></td></tr>
-          </tbody>
-        </table>
-      </section>
+      <tr class="rev-g group-${group.id}"><th colspan="3">${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</th></tr>
+      ${list}
+      <tr class="rev-sum">
+        <th class="name">Итого</th>
+        <td>${formatGrams(sum)}</td>
+        <td>${prev ? formatGrams(usedSum) : ""}</td>
+      </tr>
     `;
   }).join("");
   const prevTotal = prev ? revisionTotal(prev) : 0;
@@ -1435,38 +1436,44 @@ function renderRevisionReport() {
   const nowCoals = Number(rev.coals || 0);
   const usedCoalsN = prev ? prevCoals - nowCoals : null;
   paper.classList.add("rev-shot");
+  paper.classList.toggle("is-dense", itemCount > 16);
   paper.innerHTML = `
     <header class="report-head">
-      <h1>${escapeHtml(venueName())} · Ревизия · ${month}</h1>
-      <p class="report-rates">Снятие ${snap}</p>
+      <h1>${escapeHtml(venueName())} · Ревизия</h1>
+      <p class="report-rates">${month} · снятие ${snap}</p>
     </header>
-    <div class="rev-shot-grid">${groupCards || `<p class="rev-shot-empty">Марок в этом месяце нет</p>`}</div>
-    <div class="excel-card report-pay rev-shot-totals">
-      <table class="pay">
-        <thead>
-          <tr>
-            <th class="name"></th>
-            <th>Прошлый</th>
-            <th>Снятие</th>
-            <th>−</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th class="name">Табак, г</th>
-            <td>${formatGrams(prevTotal)}</td>
-            <td>${formatGrams(nowTotal)}</td>
-            <td class="sum">${usedTotal == null ? "—" : formatGrams(usedTotal)}</td>
-          </tr>
-          <tr>
-            <th class="name">Угли, шт</th>
-            <td>${formatGrams(prevCoals)}</td>
-            <td>${formatGrams(nowCoals)}</td>
-            <td class="sum">${usedCoalsN == null ? "—" : formatGrams(usedCoalsN)}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    ${body
+      ? `<table class="rev-shot-sheet">
+          <colgroup><col class="name"><col class="num"><col class="num"></colgroup>
+          <thead><tr><th class="name">Марка</th><th>г</th><th>−</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>`
+      : `<p class="rev-shot-empty">Марок в этом месяце нет</p>`}
+    <table class="rev-shot-sheet rev-shot-foot">
+      <colgroup><col class="name"><col class="num"><col class="num"><col class="num"></colgroup>
+      <thead>
+        <tr>
+          <th class="name"></th>
+          <th>Прошлый</th>
+          <th>Снятие</th>
+          <th>−</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="name">Табак, г</th>
+          <td>${formatGrams(prevTotal)}</td>
+          <td>${formatGrams(nowTotal)}</td>
+          <td>${usedTotal == null ? "—" : formatGrams(usedTotal)}</td>
+        </tr>
+        <tr>
+          <th class="name">Угли, шт</th>
+          <td>${formatGrams(prevCoals)}</td>
+          <td>${formatGrams(nowCoals)}</td>
+          <td>${usedCoalsN == null ? "—" : formatGrams(usedCoalsN)}</td>
+        </tr>
+      </tbody>
+    </table>
   `;
   requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
