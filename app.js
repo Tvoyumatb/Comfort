@@ -1,4 +1,4 @@
-const APP_VERSION = "82";
+const APP_VERSION = "83";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -493,6 +493,7 @@ function normalizeVenue(data, venueId) {
     invoicesFromStartV1: Boolean(data.invoicesFromStartV1),
     monthlyCountV1: Boolean(data.monthlyCountV1),
     loungeBoughtV1: Boolean(data.loungeBoughtV1),
+    loungeBoughtUndoV1: Boolean(data.loungeBoughtUndoV1),
   };
   return applySplitClassicPack(applyMonthlyCount(applyStartInvoices(
     shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId),
@@ -1941,30 +1942,21 @@ function stockNow(item) {
   return Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
 }
 
-function stockTarget(item) {
-  return Math.max(Number(item.start || 0), 3);
+function itemNeedBuy(item) {
+  return Math.max(0, Number(item?.needBuy || 0));
 }
 
 function stockNeedsBuy(item) {
-  const now = stockNow(item);
-  const fines = fineQtyFor(item.name);
-  if (now <= 2) return true;
-  if (item.alert && now < stockTarget(item)) return true;
-  if (fines > 0 && now < stockTarget(item)) return true;
-  return false;
+  return itemNeedBuy(item) > 0;
 }
 
 function stockAlertReason(item) {
-  const now = stockNow(item);
-  const fines = fineQtyFor(item.name);
-  if (now <= 0) return "нет в наличии";
-  if (fines > 0 && now < stockTarget(item)) return `порча ${fines} шт, осталось ${now}`;
-  if (now <= 2) return `мало: ${now} ${stockUnit(item)}`;
-  return "нужно закупить";
+  const need = itemNeedBuy(item);
+  return need > 1 ? `закупить ${need} шт` : "закупить";
 }
 
 function loungeAlertRows() {
-  const inv = ensureInventory()
+  return ensureInventory()
     .filter((item) => stockNeedsBuy(item))
     .map((item) => ({
       name: item.name,
@@ -1972,29 +1964,13 @@ function loungeAlertRows() {
       unit: stockUnit(item),
       reason: stockAlertReason(item),
       restock: item.name,
+      qty: itemNeedBuy(item),
       coal: false,
     }));
-  const coal = ensureCoalStock()
-    .filter((item) => coalNow(item) <= 0)
-    .map((item) => ({
-      name: item.name,
-      now: coalNow(item),
-      unit: "шт",
-      reason: "уголь закончился",
-      restock: item.name,
-      coal: true,
-    }));
-  return [...inv, ...coal];
-}
-
-function clearStockWatch(name) {
-  const item = ensureInventory().find((row) => row.name.toLowerCase() === String(name || "").toLowerCase());
-  if (!item) return;
-  if (stockNow(item) >= stockTarget(item)) item.alert = false;
 }
 
 function isHypeBowl(name) {
-  return /hype/i.test(String(name || ""));
+  return /hype|хайп/i.test(String(name || ""));
 }
 
 function ensureHypeBowl() {
@@ -2004,14 +1980,16 @@ function ensureHypeBowl() {
     found.kind = "bowl";
     return found;
   }
-  const created = { id: uid(), name: "Hype", start: 0, kind: "bowl", alert: true };
+  const created = { id: uid(), name: "Hype", start: 0, kind: "bowl", needBuy: 1 };
   stock.push(created);
   return created;
 }
 
 function buyWithoutInvoice(name, qty = 1, kind = "inventory") {
   const amount = Math.max(1, Number(qty || 1));
-  const product = kind === "coal" ? ensureCoalItem(name).name : ensureStockItem(name, /чаш|hype/i.test(name) ? "bowl" : "item").name;
+  const product = kind === "coal"
+    ? ensureCoalItem(name).name
+    : ensureStockItem(name, /чаш|hype|хайп/i.test(name) ? "bowl" : "item").name;
   if (!Array.isArray(state.tobacco)) state.tobacco = [];
   state.tobacco.push({
     id: uid(),
@@ -2023,34 +2001,42 @@ function buyWithoutInvoice(name, qty = 1, kind = "inventory") {
     sum: 0,
     note: "закуп без накладной",
   });
-  if (kind === "inventory") {
-    const item = ensureStockItem(product);
-    if (stockNow(item) >= stockTarget(item)) item.alert = false;
-  }
 }
 
-function settleBoughtExceptHype() {
-  if (state.loungeBoughtV1) return;
-  ensureHypeBowl();
-  ensureInventory().forEach((item) => {
-    if (isHypeBowl(item.name)) {
-      item.alert = true;
-      return;
-    }
-    if (!stockNeedsBuy(item)) {
-      item.alert = false;
-      return;
-    }
-    const need = Math.max(1, stockTarget(item) - stockNow(item));
-    buyWithoutInvoice(item.name, need, "inventory");
-    item.alert = false;
-  });
-  ensureCoalStock().forEach((item) => {
-    const now = coalNow(item);
-    if (now > 0) return;
-    buyWithoutInvoice(item.name, Math.max(1, -now + 1), "coal");
-  });
+function fulfillNeedBuy(name, kind = "inventory") {
+  if (kind === "coal") {
+    const item = ensureCoalItem(name);
+    const qty = Math.max(1, itemNeedBuy(item) || 1);
+    buyWithoutInvoice(name, qty, "coal");
+    item.needBuy = 0;
+    return;
+  }
+  const item = ensureStockItem(name, /чаш|hype|хайп/i.test(name) ? "bowl" : "item");
+  const qty = Math.max(1, itemNeedBuy(item) || 1);
+  buyWithoutInvoice(item.name, qty, "inventory");
+  item.needBuy = 0;
+  item.alert = false;
+}
+
+function markNeedBuy(name, qty = 1) {
+  const item = ensureStockItem(name, /чаш|hype|хайп/i.test(name) ? "bowl" : "item");
+  item.needBuy = itemNeedBuy(item) + Math.max(1, Number(qty || 1));
+  item.alert = true;
+  return item;
+}
+
+function undoFalseBuys() {
+  if (state.loungeBoughtUndoV1) return;
+  if (state.loungeBoughtV1) {
+    state.tobacco = (state.tobacco || []).filter((row) => row.note !== "закуп без накладной");
+  }
+  const hype = ensureHypeBowl();
+  const bought = (state.tobacco || []).some((row) =>
+    (row.kind || "tobacco") === "inventory" && isHypeBowl(row.product)
+  );
+  if (!bought) hype.needBuy = Math.max(1, itemNeedBuy(hype));
   state.loungeBoughtV1 = true;
+  state.loungeBoughtUndoV1 = true;
   save();
 }
 
@@ -2366,7 +2352,7 @@ function renderStockRows(items, { restockAttr, startAttr, delAttr, extraCols, co
         ${extra.mid}
         <td class="sum">${now} ${extra.unit}</td>
         <td>
-          <button type="button" class="primary compact" ${restockAttr}="${escapeHtml(item.name)}" aria-label="Закупил">+</button>
+          ${extra.watch ? `<button type="button" class="primary compact" ${restockAttr}="${escapeHtml(item.name)}" aria-label="Закупил">+</button>` : ""}
           <button type="button" class="danger" ${delAttr}="${item.id}">Удалить</button>
         </td>
       </tr>
@@ -2383,23 +2369,19 @@ function renderLoungeAlerts() {
     badge.textContent = rows.length ? String(rows.length) : "";
   }
   if (!box) return;
-  const list = rows.length
-    ? rows.map((row) => `
+  if (!rows.length) {
+    box.innerHTML = "";
+    return;
+  }
+  box.innerHTML = `
+    <div class="lounge-alert">
+      <p>Сломали / нехватка</p>
+      ${rows.map((row) => `
         <div class="need-row">
           <span><strong>${escapeHtml(row.name)}</strong> — ${escapeHtml(row.reason)}</span>
           <button type="button" class="primary compact" data-buy="${escapeHtml(row.restock)}" data-buy-kind="${row.coal ? "coal" : "inventory"}">+</button>
         </div>
-      `).join("")
-    : `<p class="need-ok">Нехватки нет</p>`;
-  box.innerHTML = `
-    <div class="lounge-alert">
-      <p>Нехватка</p>
-      ${list}
-      <form class="add-brand need-buy-form" id="needBuyForm">
-        <input type="text" name="name" list="fineWhatList" placeholder="Что закупил без накладной" required>
-        <input type="number" name="qty" min="1" step="1" value="1" inputmode="numeric" aria-label="Штук">
-        <button type="submit" class="primary compact">+</button>
-      </form>
+      `).join("")}
     </div>
   `;
 }
@@ -2472,15 +2454,15 @@ function renderInventoryStock() {
             startAttr: "data-coal-start",
             delAttr: "data-del-coal-stock",
             colCount: 5,
-            extraCols: (item) => {
-              const income = incomingQtyFor(item.name, "coal");
-              return {
-                now: coalNow(item),
-                unit: "шт",
-                watch: coalNow(item) <= 0,
-                mid: `<td>${formatGrams(income)}</td>`,
-              };
-            },
+              extraCols: (item) => {
+                const income = incomingQtyFor(item.name, "coal");
+                return {
+                  now: coalNow(item),
+                  unit: "шт",
+                  watch: itemNeedBuy(item) > 0,
+                  mid: `<td>${formatGrams(income)}</td>`,
+                };
+              },
           })}
         </tbody>
       </table>
@@ -2494,7 +2476,7 @@ function renderInventoryStock() {
 }
 
 function renderLounge() {
-  settleBoughtExceptHype();
+  undoFalseBuys();
   renderLoungeAlerts();
   renderInventoryStock();
   renderFines();
@@ -2626,8 +2608,7 @@ $("#fineForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const what = data.what.trim();
-  const item = ensureStockItem(what);
-  item.alert = true;
+  markNeedBuy(what, data.qty);
   if (!Array.isArray(state.fines)) state.fines = [];
   state.fines.push({
     id: uid(),
@@ -3365,7 +3346,11 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
       sum: Number(data.sum || 0),
       note: (data.note || "").trim(),
     });
-    if (kind === "inventory") clearStockWatch(product);
+    if (kind === "inventory") {
+      const stock = ensureStockItem(product);
+      stock.needBuy = Math.max(0, itemNeedBuy(stock) - Number(data.qty || 1));
+      if (!stock.needBuy) stock.alert = false;
+    }
   }
   save();
   e.target.reset();
@@ -3392,14 +3377,22 @@ document.addEventListener("click", (e) => {
   }
   const fineId = e.target.dataset.delFine;
   if (fineId) {
+    const gone = (state.fines || []).find((f) => f.id === fineId);
     state.fines = (state.fines || []).filter((f) => f.id !== fineId);
+    if (gone?.what) {
+      const item = ensureInventory().find((row) => row.name.toLowerCase() === gone.what.toLowerCase());
+      if (item) {
+        item.needBuy = Math.max(0, itemNeedBuy(item) - Number(gone.qty || 1));
+        if (!item.needBuy) item.alert = false;
+      }
+    }
     save();
     renderShifts();
     renderLounge();
   }
   const buy = e.target.dataset.buy;
   if (buy) {
-    buyWithoutInvoice(buy, 1, e.target.dataset.buyKind === "coal" ? "coal" : "inventory");
+    fulfillNeedBuy(buy, e.target.dataset.buyKind === "coal" ? "coal" : "inventory");
     save();
     renderLounge();
     renderTobacco();
@@ -3407,7 +3400,7 @@ document.addEventListener("click", (e) => {
   }
   const restock = e.target.dataset.restock;
   if (restock) {
-    buyWithoutInvoice(restock, 1, "inventory");
+    fulfillNeedBuy(restock, "inventory");
     save();
     renderLounge();
     renderTobacco();
@@ -3415,7 +3408,7 @@ document.addEventListener("click", (e) => {
   }
   const restockCoal = e.target.dataset.restockCoal;
   if (restockCoal) {
-    buyWithoutInvoice(restockCoal, 1, "coal");
+    fulfillNeedBuy(restockCoal, "coal");
     save();
     renderLounge();
     renderTobacco();
@@ -3468,20 +3461,6 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("submit", (e) => {
-  if (e.target.id === "needBuyForm") {
-    e.preventDefault();
-    const data = Object.fromEntries(new FormData(e.target));
-    const name = (data.name || "").trim();
-    if (!name) return;
-    buyWithoutInvoice(name, data.qty, /угол/i.test(name) ? "coal" : "inventory");
-    save();
-    e.target.reset();
-    const qty = e.target.querySelector('[name="qty"]');
-    if (qty) qty.value = "1";
-    renderLounge();
-    renderTobacco();
-    return;
-  }
   if (e.target.id === "addCoalStockForm") {
     e.preventDefault();
     const name = new FormData(e.target).get("name").trim();

@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v82 shortage plus buy without invoice
+  // v83 plus next to broken items
   event.waitUntil(self.skipWaiting());
 });
 
