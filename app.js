@@ -1318,7 +1318,14 @@ function renderReport() {
     </header>
 
     <div class="excel-card report-roster">
-      <table class="roster" style="--rows:${state.employees.length}"><thead>${rosterHead}</thead><tbody>${rosterBody}</tbody></table>
+      <table class="roster" style="--rows:${state.employees.length};--days:${days.length}">
+        <colgroup>
+          <col class="name">
+          ${days.map(() => `<col>`).join("")}
+        </colgroup>
+        <thead>${rosterHead}</thead>
+        <tbody>${rosterBody}</tbody>
+      </table>
     </div>
 
     <div class="excel-card report-pay">

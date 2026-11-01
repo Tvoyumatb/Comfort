@@ -1155,6 +1155,11 @@ input[type="number"] {
 .report-paper .roster {
   table-layout: fixed;
   width: 100%;
+  border-collapse: collapse;
+}
+
+.report-paper .roster col.name {
+  width: 22%;
 }
 
 .report-paper .report-pay {
@@ -1184,6 +1189,14 @@ input[type="number"] {
   padding: 6px 7px;
   height: auto;
   line-height: 1.25;
+  overflow: hidden;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.report-paper .roster th,
+.report-paper .roster td {
+  padding: 4px 3px;
 }
 
 .report-paper .roster th {
@@ -1201,26 +1214,39 @@ input[type="number"] {
 
 .report-paper .roster .name,
 .report-paper .pay .name {
-  position: static;
-  min-width: 168px;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
   max-width: none;
   width: auto;
-  padding: 6px 10px;
-  font-size: 12px;
-  line-height: 1.25;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.2;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #fff;
+}
+
+.report-paper .roster thead .name,
+.report-paper .pay thead .name {
+  background: #f3f3f3;
 }
 
 .report-paper .cell {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  min-height: 24px;
   height: auto;
-  padding: 4px 2px;
-  font-size: 11px;
+  width: 100%;
+  max-width: 100%;
+  padding: 3px 1px;
+  font-size: 10px;
   white-space: nowrap;
+  overflow: hidden;
   cursor: default;
+  box-sizing: border-box;
 }
 
 .report-split {
