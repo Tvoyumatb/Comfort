@@ -1,5 +1,5 @@
-const APP_VERSION = "67";
-const APP_NOTES = "Большая кнопка «Обновить сайт» под названием. Можно и потянуть вниз.";
+const APP_VERSION = "68";
+const APP_NOTES = "Вернул смены, приход и сотрудников. Обновление больше не затирает журнал.";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -578,6 +578,7 @@ function shouldUseRemote(remote, local) {
   const lf = dbFill(local);
   if (rf === 0 && lf > 0) return false;
   if (lf === 0 && rf > 0) return true;
+  if (rf < lf * 0.6) return false;
   if (rt > lt) return true;
   if (rt === lt && rf > lf) return true;
   return false;
