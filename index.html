@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=64">
+  <link rel="stylesheet" href="style.css?v=65">
 </head>
 <body>
   <header class="topbar no-print">
@@ -21,6 +21,7 @@
       <p class="sync-line" id="syncStatus">Связываю телефон и ноут…</p>
     </div>
     <div class="top-actions">
+      <button type="button" class="ghost" id="reloadBtn">Обновить</button>
       <button type="button" class="ghost" id="exportBtn">Копия</button>
       <button type="button" class="ghost" id="importBtn">Залить</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -28,6 +29,11 @@
       <button type="button" class="ghost" id="printBtn">Печать</button>
     </div>
   </header>
+
+  <div id="updateBanner" class="update-banner no-print" hidden>
+    <p id="updateText">Журнал обновился</p>
+    <button type="button" class="primary compact" id="updateOk">Понятно</button>
+  </div>
 
   <nav class="venues no-print" role="tablist" aria-label="Заведение">
     <button type="button" class="venue is-active" data-venue="tangiers">Tangiers</button>
@@ -287,6 +293,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=64"></script>
+  <script src="app.js?v=65"></script>
 </body>
 </html>

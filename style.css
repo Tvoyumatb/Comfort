@@ -140,6 +140,34 @@ body[data-venue="shishka"]::before {
   cursor: pointer;
 }
 
+#reloadBtn {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 var(--pad) 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.16);
+  border: 1px solid var(--accent);
+  color: var(--text);
+}
+
+.update-banner[hidden] {
+  display: none;
+}
+
+.update-banner p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 h1 {
   margin: 0;
   font-size: 22px;

@@ -1,3 +1,5 @@
+const APP_VERSION = "65";
+const APP_NOTES = "Отчёт целиком на экране, таблица утр и вечеров короче, кнопка Назад внизу.";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -2960,10 +2962,45 @@ window.addEventListener("afterprint", () => {
   document.body.classList.remove("print-checklist", "print-report");
 });
 
+function showUpdateNote() {
+  if (localStorage.getItem("journal-seen") === APP_VERSION) return;
+  const banner = $("#updateBanner");
+  const text = $("#updateText");
+  if (text) text.textContent = `Журнал обновился. ${APP_NOTES}`;
+  if (banner) banner.hidden = false;
+}
+
+function dismissUpdateNote() {
+  localStorage.setItem("journal-seen", APP_VERSION);
+  const banner = $("#updateBanner");
+  if (banner) banner.hidden = true;
+}
+
+async function hardReload() {
+  dismissUpdateNote();
+  setSyncStatus?.("Загружаю новую версию…");
+  localStorage.setItem("journal-sw", APP_VERSION);
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+  } catch {}
+  try {
+    const regs = await navigator.serviceWorker?.getRegistrations?.();
+    await Promise.all((regs || []).map((reg) => reg.update()));
+  } catch {}
+  const url = new URL(location.href);
+  url.searchParams.set("r", String(Date.now()));
+  location.replace(url.pathname + url.search + url.hash);
+}
+
+$("#reloadBtn")?.addEventListener("click", () => hardReload());
+$("#updateOk")?.addEventListener("click", () => dismissUpdateNote());
+showUpdateNote();
+
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "64") {
+  if (localStorage.getItem("journal-sw") !== APP_VERSION) {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "64");
+    localStorage.setItem("journal-sw", APP_VERSION);
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();
