@@ -11,37 +11,14 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=73">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <link rel="stylesheet" href="style.css?v=74">
   <style>#reloadBtn,.reload-site,.update-banner{display:none!important}</style>
   <script>
-    window.forceJournalReload = function (btn) {
+    window.forceJournalReload = function () {
       if (window.__journalReloading) return;
       window.__journalReloading = true;
-      if (btn && btn.textContent) btn.textContent = "Обновляю…";
-      var hint = document.getElementById("pullRefresh");
-      if (hint) {
-        hint.style.height = "72px";
-        hint.textContent = "Обновляю…";
-      }
-      var gone = false;
-      function go() {
-        if (gone) return;
-        gone = true;
-        var path = location.pathname.replace(/index\.html$/i, "");
-        if (path.slice(-1) !== "/") path += "/";
-        location.replace(path + "?r=" + Date.now());
-      }
-      setTimeout(go, 2000);
-      var chain = Promise.resolve();
-      if (navigator.serviceWorker) {
-        chain = chain.then(function () { return navigator.serviceWorker.getRegistrations(); })
-          .then(function (regs) { return Promise.all((regs || []).map(function (reg) { return reg.unregister(); })); });
-      }
-      if (window.caches) {
-        chain = chain.then(function () { return caches.keys(); })
-          .then(function (keys) { return Promise.all(keys.map(function (key) { return caches.delete(key); })); });
-      }
-      chain.then(go, go);
+      location.reload();
     };
   </script>
 </head>
@@ -325,7 +302,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=73"></script>
+  <script src="app.js?v=74"></script>
   <script>
     (function () {
       var startY = 0;

@@ -1,6 +1,6 @@
-const APP_VERSION = "73";
+const APP_VERSION = "74";
 const APP_NOTES = "";
-const RESTORE_URL = "./journal-restore.json?v=73";
+const RESTORE_URL = "./journal-restore.json?v=74";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -3304,14 +3304,14 @@ window.addEventListener("afterprint", () => {
 localStorage.setItem("journal-seen", APP_VERSION);
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== APP_VERSION) {
-    caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", APP_VERSION);
-  }
-  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
-    reg.update();
+  navigator.serviceWorker.getRegistrations?.().then((regs) => {
+    (regs || []).forEach((reg) => reg.unregister());
   }).catch(() => {});
 }
+if (window.caches?.keys) {
+  caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
+}
+localStorage.removeItem("journal-sw");
 
 ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
   document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
