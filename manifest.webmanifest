@@ -2,7 +2,7 @@
   "name": "Журнал точки",
   "short_name": "Журнал",
   "description": "Табель, ревизия и приход Tangiers и Shishka Premium",
-  "start_url": "/Comfort/",
+  "start_url": "/Comfort/?b=88",
   "scope": "/Comfort/",
   "display": "standalone",
   "orientation": "portrait",

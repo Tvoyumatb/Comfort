@@ -1,4 +1,4 @@
-const APP_VERSION = "87";
+const APP_VERSION = "88";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -3651,8 +3651,8 @@ window.addEventListener("afterprint", () => {
 localStorage.setItem("journal-seen", APP_VERSION);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
-    reg.update();
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
   }).catch(() => {});
 }
 if (window.caches?.keys) {

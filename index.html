@@ -23,28 +23,66 @@
   </style>
   <script>
     (function () {
+      var BUILD = "88";
       var params = new URLSearchParams(location.search);
+      function scrubJournal() {
+        try {
+          var raw = localStorage.getItem("shop-reports-v4");
+          if (!raw) return;
+          var db = JSON.parse(raw);
+          var changed = false;
+          Object.keys(db.venues || {}).forEach(function (key) {
+            var venue = db.venues[key];
+            if (!venue || !venue.employees) return;
+            var next = venue.employees.filter(function (emp) {
+              var name = String(emp && emp.name || "").toLowerCase();
+              return !/бывш/.test(name) && !/уш[её]л/.test(name);
+            });
+            if (next.length !== venue.employees.length) {
+              venue.employees = next;
+              changed = true;
+            }
+          });
+          if (changed) localStorage.setItem("shop-reports-v4", JSON.stringify(db));
+        } catch (err) {}
+      }
+      function loadAssets() {
+        var stamp = params.get("n") || Date.now();
+        var css = document.createElement("link");
+        css.rel = "stylesheet";
+        css.href = "style.css?v=" + BUILD + "&n=" + stamp;
+        document.head.appendChild(css);
+        window.addEventListener("DOMContentLoaded", function () {
+          var script = document.createElement("script");
+          script.src = "app.js?v=" + BUILD + "&n=" + stamp;
+          document.body.appendChild(script);
+        });
+      }
       window.forceJournalReload = function () {
         params.set("n", Date.now());
+        params.set("b", BUILD);
         location.replace(location.pathname + "?" + params.toString() + location.hash);
       };
+      scrubJournal();
+      var jobs = [];
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then(function (reg) {
-          return reg.update();
-        }).catch(function () {});
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+          return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+        }).catch(function () {}));
       }
-      if (!params.get("n")) {
-        window.forceJournalReload();
-        return;
+      if (window.caches && caches.keys) {
+        jobs.push(caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+        }).catch(function () {}));
       }
-      var css = document.createElement("link");
-      css.rel = "stylesheet";
-      css.href = "style.css?v=87&n=" + params.get("n");
-      document.head.appendChild(css);
-      window.addEventListener("DOMContentLoaded", function () {
-        var script = document.createElement("script");
-        script.src = "app.js?v=87&n=" + params.get("n");
-        document.body.appendChild(script);
+      var ready = Promise.all(jobs);
+      var timeout = new Promise(function (resolve) { setTimeout(resolve, 900); });
+      Promise.race([ready, timeout]).then(function () {
+        if (params.get("b") !== BUILD) {
+          window.forceJournalReload();
+          return;
+        }
+        loadAssets();
       });
     })();
   </script>
