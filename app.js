@@ -1315,7 +1315,7 @@ function renderReport() {
     </header>
 
     <div class="excel-card report-roster">
-      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(108px,1.15fr) repeat(${days.length},minmax(0,1fr));width:100%">
+      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(0,7.6em) repeat(${days.length},minmax(0,1fr));width:100%;min-width:0">
         ${rosterCells}
       </div>
     </div>
@@ -1357,8 +1357,6 @@ function fitReportPaper() {
   const frame = paper?.closest(".report-frame");
   if (!paper || !frame || $("#reportView")?.hidden) return;
   paper.style.transform = "none";
-  const portrait = window.matchMedia("(orientation: portrait)").matches;
-  if (portrait) return;
   const width = Math.max(paper.scrollWidth, paper.offsetWidth, 1);
   const height = Math.max(paper.scrollHeight, paper.offsetHeight, 1);
   const scale = Math.min(frame.clientWidth / width, frame.clientHeight / height, 1);

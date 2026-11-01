@@ -1156,6 +1156,8 @@ input[type="number"] {
   display: grid;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 7.6em) repeat(var(--days, 15), minmax(0, 1fr));
   background: #fff;
   border-top: 1px solid #b4b4b4;
   border-left: 1px solid #b4b4b4;
