@@ -11,7 +11,38 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=66">
+  <link rel="stylesheet" href="style.css?v=67">
+  <script>
+    window.forceJournalReload = function (btn) {
+      if (window.__journalReloading) return;
+      window.__journalReloading = true;
+      if (btn && btn.textContent) btn.textContent = "Обновляю…";
+      var hint = document.getElementById("pullRefresh");
+      if (hint) {
+        hint.style.height = "72px";
+        hint.textContent = "Обновляю…";
+      }
+      var gone = false;
+      function go() {
+        if (gone) return;
+        gone = true;
+        var path = location.pathname.replace(/index\.html$/i, "");
+        if (path.slice(-1) !== "/") path += "/";
+        location.replace(path + "?r=" + Date.now());
+      }
+      setTimeout(go, 2000);
+      var chain = Promise.resolve();
+      if (navigator.serviceWorker) {
+        chain = chain.then(function () { return navigator.serviceWorker.getRegistrations(); })
+          .then(function (regs) { return Promise.all((regs || []).map(function (reg) { return reg.unregister(); })); });
+      }
+      if (window.caches) {
+        chain = chain.then(function () { return caches.keys(); })
+          .then(function (keys) { return Promise.all(keys.map(function (key) { return caches.delete(key); })); });
+      }
+      chain.then(go, go);
+    };
+  </script>
 </head>
 <body>
   <div id="pullRefresh" class="pull-refresh no-print" aria-hidden="true">Потяни вниз — обновить</div>
@@ -22,7 +53,6 @@
       <p class="sync-line" id="syncStatus">Связываю телефон и ноут…</p>
     </div>
     <div class="top-actions">
-      <button type="button" class="ghost" id="reloadBtn">Обновить</button>
       <button type="button" class="ghost" id="exportBtn">Копия</button>
       <button type="button" class="ghost" id="importBtn">Залить</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -30,6 +60,8 @@
       <button type="button" class="ghost" id="printBtn">Печать</button>
     </div>
   </header>
+
+  <button type="button" class="primary reload-site no-print" id="reloadBtn">Обновить сайт</button>
 
   <div id="updateBanner" class="update-banner no-print" hidden>
     <p id="updateText">Журнал обновился</p>
@@ -294,6 +326,64 @@
     </div>
   </div>
 
-  <script src="app.js?v=66"></script>
+  <script src="app.js?v=67"></script>
+  <script>
+    (function () {
+      var btn = document.getElementById("reloadBtn");
+      if (btn) btn.addEventListener("click", function () { window.forceJournalReload(btn); });
+      var startY = 0;
+      var startX = 0;
+      var pulling = false;
+      var armed = false;
+      function pageY() {
+        return window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      }
+      function hint(h, ready) {
+        var el = document.getElementById("pullRefresh");
+        if (!el || window.__journalReloading) return;
+        el.style.height = Math.max(0, h) + "px";
+        el.textContent = ready ? "Отпусти — обновить" : "Потяни вниз — обновить";
+      }
+      window.addEventListener("touchstart", function (event) {
+        if (event.touches.length !== 1 || document.body.classList.contains("report-open")) {
+          pulling = false;
+          return;
+        }
+        if (pageY() > 8) {
+          pulling = false;
+          return;
+        }
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+        pulling = true;
+        armed = false;
+      }, { capture: true, passive: true });
+      window.addEventListener("touchmove", function (event) {
+        if (!pulling || event.touches.length !== 1) return;
+        var dx = event.touches[0].clientX - startX;
+        var dy = event.touches[0].clientY - startY;
+        if (Math.abs(dx) > Math.abs(dy) + 10) {
+          pulling = false;
+          hint(0, false);
+          return;
+        }
+        if (dy < 0) {
+          armed = false;
+          hint(0, false);
+          return;
+        }
+        if (dy > 4) event.preventDefault();
+        var dist = Math.min(dy, 120);
+        armed = dist > 52;
+        hint(dist, armed);
+      }, { capture: true, passive: false });
+      window.addEventListener("touchend", function () {
+        if (!pulling) return;
+        pulling = false;
+        if (armed) window.forceJournalReload(btn);
+        else hint(0, false);
+      }, { capture: true });
+    })();
+  </script>
 </body>
 </html>

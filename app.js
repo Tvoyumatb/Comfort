@@ -1,5 +1,5 @@
-const APP_VERSION = "66";
-const APP_NOTES = "Потяни страницу вниз сверху — сайт обновится.";
+const APP_VERSION = "67";
+const APP_NOTES = "Большая кнопка «Обновить сайт» под названием. Можно и потянуть вниз.";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -2976,106 +2976,8 @@ function dismissUpdateNote() {
   if (banner) banner.hidden = true;
 }
 
-let reloading = false;
-let pullStartY = 0;
-let pullStartX = 0;
-let pulling = false;
-let pullArmed = false;
-
-function setPullHint(height, ready, loading) {
-  const el = $("#pullRefresh");
-  if (!el) return;
-  el.style.height = `${Math.max(0, height)}px`;
-  el.classList.toggle("is-ready", !!ready);
-  el.textContent = loading
-    ? "Обновляю…"
-    : ready
-      ? "Отпусти — обновить"
-      : "Потяни вниз — обновить";
-}
-
-function canPullFrom(target) {
-  if (document.body.classList.contains("report-open")) return false;
-  if (window.scrollY > 2) return false;
-  if (target?.closest?.("input, textarea, select")) return false;
-  let node = target;
-  while (node && node !== document.body && node !== document.documentElement) {
-    if (node.scrollTop > 0) return false;
-    node = node.parentElement;
-  }
-  return true;
-}
-
-async function hardReload() {
-  if (reloading) return;
-  reloading = true;
-  dismissUpdateNote();
-  setPullHint(72, true, true);
-  setSyncStatus?.("Загружаю новую версию…");
-  localStorage.setItem("journal-sw", APP_VERSION);
-  try {
-    const keys = await caches.keys();
-    await Promise.all(keys.map((key) => caches.delete(key)));
-  } catch {}
-  try {
-    const regs = await navigator.serviceWorker?.getRegistrations?.();
-    await Promise.all((regs || []).map((reg) => reg.update()));
-  } catch {}
-  const url = new URL(location.href);
-  url.searchParams.set("r", String(Date.now()));
-  location.replace(url.pathname + url.search + url.hash);
-}
-
-$("#reloadBtn")?.addEventListener("click", () => hardReload());
 $("#updateOk")?.addEventListener("click", () => dismissUpdateNote());
 showUpdateNote();
-
-document.addEventListener("touchstart", (event) => {
-  if (event.touches.length !== 1 || !canPullFrom(event.target)) {
-    pulling = false;
-    return;
-  }
-  pullStartX = event.touches[0].clientX;
-  pullStartY = event.touches[0].clientY;
-  pulling = true;
-  pullArmed = false;
-}, { passive: true });
-
-document.addEventListener("touchmove", (event) => {
-  if (!pulling || event.touches.length !== 1) return;
-  const touch = event.touches[0];
-  const dx = touch.clientX - pullStartX;
-  const dy = touch.clientY - pullStartY;
-  if (Math.abs(dx) > Math.abs(dy) + 8) {
-    pulling = false;
-    setPullHint(0, false);
-    return;
-  }
-  if (window.scrollY > 2 || dy < 0) {
-    setPullHint(0, false);
-    pullArmed = false;
-    return;
-  }
-  if (dy > 6) event.preventDefault();
-  const dist = Math.min(dy, 112);
-  pullArmed = dist > 68;
-  setPullHint(dist, pullArmed);
-}, { passive: false });
-
-document.addEventListener("touchend", () => {
-  if (!pulling) return;
-  pulling = false;
-  if (pullArmed) {
-    hardReload();
-    return;
-  }
-  setPullHint(0, false);
-});
-document.addEventListener("touchcancel", () => {
-  pulling = false;
-  pullArmed = false;
-  if (!reloading) setPullHint(0, false);
-});
 
 if ("serviceWorker" in navigator) {
   if (localStorage.getItem("journal-sw") !== APP_VERSION) {
