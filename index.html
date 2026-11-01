@@ -39,11 +39,11 @@
       }
       var css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = "style.css?v=76&n=" + params.get("n");
+      css.href = "style.css?v=77&n=" + params.get("n");
       document.head.appendChild(css);
       window.addEventListener("DOMContentLoaded", function () {
         var script = document.createElement("script");
-        script.src = "app.js?v=76&n=" + params.get("n");
+        script.src = "app.js?v=77&n=" + params.get("n");
         document.body.appendChild(script);
       });
     })();
@@ -140,6 +140,7 @@
         </div>
         <button type="button" class="icon-btn" id="nextRevMonth" aria-label="Следующий месяц">›</button>
       </div>
+      <button type="button" class="ghost rev-preview-btn" id="revisionReportBtn">Просмотр ревизии</button>
       <div class="card sheet">
         <label class="sheet-date">Дата снятия в этом месяце
           <span class="date-wrap">

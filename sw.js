@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v76 grid timesheet
+  // v77 revision screenshot
   event.waitUntil(self.skipWaiting());
 });
 

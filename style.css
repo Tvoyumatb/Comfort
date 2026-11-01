@@ -92,6 +92,13 @@ body[data-venue="shishka"]::before {
   font-size: 13px;
 }
 
+.rev-preview-btn {
+  width: calc(100% - 2 * var(--pad));
+  margin: 0 var(--pad) 10px;
+  min-height: 44px;
+  font-weight: 700;
+}
+
 .hint.warn {
   color: #ffb4a8;
   padding: 0 14px 10px;
@@ -1143,6 +1150,77 @@ input[type="number"] {
   min-height: 0;
   height: auto;
   display: block;
+}
+
+.report-paper.rev-shot {
+  grid-template-rows: auto auto auto;
+  gap: 8px;
+}
+
+.rev-shot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.rev-shot-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px;
+  color: #333;
+  font-size: 13px;
+}
+
+.rev-shot-block {
+  min-width: 0;
+}
+
+.rev-shot-block h2 {
+  margin: 0;
+  padding: 5px 8px;
+  font-size: 12px;
+  background: #f3f3f3;
+  border-bottom: 1px solid #bbb;
+}
+
+.rev-shot-block h2 small {
+  font-weight: 600;
+  color: #444;
+}
+
+.rev-shot-block.group-classic h2 { background: #fff6c2; }
+.rev-shot-block.group-premium h2 { background: #f1e4ff; }
+.rev-shot-block.group-fruit h2 { background: #dff7ea; }
+.rev-shot-block.group-tangiers h2 { background: #ffe0d2; }
+
+.rev-shot-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.rev-shot-table .name {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rev-shot-table th:nth-child(2),
+.rev-shot-table td:nth-child(2),
+.rev-shot-table th:nth-child(3),
+.rev-shot-table td:nth-child(3) {
+  width: 22%;
+  text-align: right;
+}
+
+.rev-shot-totals {
+  width: 100%;
+  max-width: none;
+}
+
+.rev-shot-totals .pay {
+  width: 100%;
 }
 
 .report-paper .roster,

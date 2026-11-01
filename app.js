@@ -1,4 +1,4 @@
-const APP_VERSION = "76";
+const APP_VERSION = "77";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -141,6 +141,7 @@ let viewRevMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let viewMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let half = new Date().getDate() > 15 ? 1 : 0;
 let incomingKind = "tobacco";
+let reportKind = "shifts";
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -1207,7 +1208,7 @@ function renderShifts() {
   renderRoster();
   renderPay();
   renderFines();
-  if (!$("#reportView")?.hidden) renderReport();
+  if (!$("#reportView")?.hidden) refreshOpenReport();
 }
 
 function reportPeriodLabel() {
@@ -1364,6 +1365,9 @@ function fitReportPaper() {
 }
 
 function openReport() {
+  reportKind = "shifts";
+  const paper = $("#reportPaper");
+  if (paper) paper.classList.remove("rev-shot");
   renderReport();
   const view = $("#reportView");
   if (view) view.hidden = false;
@@ -1375,6 +1379,111 @@ function closeReport() {
   const view = $("#reportView");
   if (view) view.hidden = true;
   document.body.classList.remove("report-open", "print-report");
+}
+
+function refreshOpenReport() {
+  if ($("#reportView")?.hidden) return;
+  if (reportKind === "revision") renderRevisionReport();
+  else renderReport();
+}
+
+function revisionReportLabel(rev) {
+  const month = `${MONTHS_RU[viewRevMonth.getMonth()]} ${viewRevMonth.getFullYear()}`;
+  const snap = parseISODate(rev.date).toLocaleDateString("ru-RU");
+  return { month, snap };
+}
+
+function renderRevisionReport() {
+  const paper = $("#reportPaper");
+  if (!paper) return;
+  const monthISO = toISODate(viewRevMonth);
+  const date = $("#revisionDate")?.value || lastDayOfMonthISO(monthISO);
+  const rev = ensureRevision(date);
+  const prev = prevMonthRevision(rev.date);
+  const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
+  const { month, snap } = revisionReportLabel(rev);
+  const groupCards = groups.map((group) => {
+    const rows = (rev.items || []).filter((item) => itemGroup(item) === group.id);
+    if (!rows.length) return "";
+    const used = prev ? usedGramsForGroup(rev, group.id, rev.date) : null;
+    const sum = rows.reduce((n, item) => n + Number(item.grams || 0), 0);
+    const body = rows.map((item) => {
+      const delta = prev ? usedGramsForItem(rev, item, rev.date) : null;
+      return `<tr>
+        <th class="name">${escapeHtml(item.name)}</th>
+        <td>${formatGrams(item.grams)}</td>
+        <td>${delta == null ? "—" : formatGrams(delta)}</td>
+      </tr>`;
+    }).join("");
+    return `
+      <section class="excel-card rev-shot-block group-${group.id}">
+        <h2>${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</h2>
+        <table class="pay rev-shot-table">
+          <thead><tr><th class="name">Марка</th><th>г</th><th>−</th></tr></thead>
+          <tbody>
+            ${body}
+            <tr><th class="name">Итого</th><td class="sum">${formatGrams(sum)}</td><td></td></tr>
+          </tbody>
+        </table>
+      </section>
+    `;
+  }).join("");
+  const prevTotal = prev ? revisionTotal(prev) : 0;
+  const nowTotal = revisionTotal(rev);
+  const usedTotal = prev ? prevTotal - nowTotal : null;
+  const prevCoals = Number(prev?.coals || 0);
+  const nowCoals = Number(rev.coals || 0);
+  const usedCoalsN = prev ? prevCoals - nowCoals : null;
+  paper.classList.add("rev-shot");
+  paper.innerHTML = `
+    <header class="report-head">
+      <h1>${escapeHtml(venueName())} · Ревизия · ${month}</h1>
+      <p class="report-rates">Снятие ${snap}</p>
+    </header>
+    <div class="rev-shot-grid">${groupCards || `<p class="rev-shot-empty">Марок в этом месяце нет</p>`}</div>
+    <div class="excel-card report-pay rev-shot-totals">
+      <table class="pay">
+        <thead>
+          <tr>
+            <th class="name"></th>
+            <th>Прошлый</th>
+            <th>Снятие</th>
+            <th>−</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th class="name">Табак, г</th>
+            <td>${formatGrams(prevTotal)}</td>
+            <td>${formatGrams(nowTotal)}</td>
+            <td class="sum">${usedTotal == null ? "—" : formatGrams(usedTotal)}</td>
+          </tr>
+          <tr>
+            <th class="name">Угли, шт</th>
+            <td>${formatGrams(prevCoals)}</td>
+            <td>${formatGrams(nowCoals)}</td>
+            <td class="sum">${usedCoalsN == null ? "—" : formatGrams(usedCoalsN)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+  requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
+}
+
+function openRevisionReport() {
+  reportKind = "revision";
+  renderRevisionReport();
+  const view = $("#reportView");
+  if (view) view.hidden = false;
+  document.body.classList.add("report-open");
+  requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
+}
+
+function syncReportBtn() {
+  const tab = document.querySelector(".tab.is-active")?.dataset.tab;
+  const btn = $("#reportBtn");
+  if (btn) btn.textContent = tab === "revision" ? "Просмотр ревизии" : "Просмотр отчёта";
 }
 
 function cycleCell(btn) {
@@ -1897,6 +2006,7 @@ function renderRevision() {
   const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
   if (!rev.items.length) {
     $("#revisionRows").innerHTML = `<p class="rev-empty">Список пустой. Добавь марку сам: тип + название + граммы остатка.</p>`;
+    if (!$("#reportView")?.hidden && reportKind === "revision") renderRevisionReport();
     return;
   }
   $("#revisionRows").innerHTML = groups
@@ -1921,6 +2031,7 @@ function renderRevision() {
       `;
     })
     .join("");
+  if (!$("#reportView")?.hidden && reportKind === "revision") renderRevisionReport();
 }
 
 function incomingRows() {
@@ -2270,6 +2381,7 @@ $$(".tab").forEach((btn) => {
       panel.classList.toggle("is-active", active);
       panel.hidden = !active;
     });
+    syncReportBtn();
   });
 });
 
@@ -3275,7 +3387,12 @@ $("#importFile")?.addEventListener("change", (e) => {
   if (file) importDb(file);
 });
 
-$("#reportBtn")?.addEventListener("click", () => openReport());
+$("#reportBtn")?.addEventListener("click", () => {
+  const tab = document.querySelector(".tab.is-active")?.dataset.tab;
+  if (tab === "revision") openRevisionReport();
+  else openReport();
+});
+$("#revisionReportBtn")?.addEventListener("click", () => openRevisionReport());
 $("#reportClose")?.addEventListener("click", () => closeReport());
 window.addEventListener("resize", () => {
   if (!$("#reportView")?.hidden) fitReportPaper();
@@ -3289,7 +3406,10 @@ $("#printBtn").addEventListener("click", () => {
   const onSheet = tab === "checklist";
   const onTimesheet = tab === "shifts" || document.body.classList.contains("report-open");
   document.body.classList.toggle("print-checklist", onSheet);
-  if (onTimesheet && !onSheet) {
+  if (!onSheet && (tab === "revision" || reportKind === "revision")) {
+    openRevisionReport();
+    document.body.classList.add("print-report");
+  } else if (onTimesheet && !onSheet) {
     openReport();
     document.body.classList.add("print-report");
   }
@@ -3329,6 +3449,7 @@ document.addEventListener("touchend", (event) => {
 document.addEventListener("dblclick", (event) => event.preventDefault());
 
 syncVenueUi();
+syncReportBtn();
 setTodayDefaults();
 render();
 bootCloud();
