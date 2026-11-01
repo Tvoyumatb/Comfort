@@ -13,7 +13,14 @@
   <title>Отчёты: смены и табак</title>
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
-  <style>#reloadBtn,.reload-site,.update-banner{display:none!important}</style>
+  <style>
+    #reloadBtn,.reload-site,.update-banner{display:none!important}
+    .report-timesheet{display:grid;width:100%;min-width:0;border-top:1px solid #b4b4b4;border-left:1px solid #b4b4b4}
+    .report-timesheet>*{min-width:0;overflow:hidden;border-right:1px solid #b4b4b4;border-bottom:1px solid #b4b4b4;box-sizing:border-box}
+    .report-timesheet .rt-name{position:static;display:flex;align-items:center;padding:4px 6px;background:#fff;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
+    .report-timesheet .rt-head{background:#f3f3f3;font-weight:700;text-align:center;padding:5px 2px}
+    .report-timesheet .rt-shift{display:flex;align-items:center;justify-content:center;min-height:28px;font-size:10px}
+  </style>
   <script>
     (function () {
       var params = new URLSearchParams(location.search);
@@ -32,11 +39,11 @@
       }
       var css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = "style.css?n=" + params.get("n");
+      css.href = "style.css?v=76&n=" + params.get("n");
       document.head.appendChild(css);
       window.addEventListener("DOMContentLoaded", function () {
         var script = document.createElement("script");
-        script.src = "app.js?n=" + params.get("n");
+        script.src = "app.js?v=76&n=" + params.get("n");
         document.body.appendChild(script);
       });
     })();

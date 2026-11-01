@@ -1,4 +1,5 @@
 self.addEventListener("install", (event) => {
+  // v76 grid timesheet
   event.waitUntil(self.skipWaiting());
 });
 

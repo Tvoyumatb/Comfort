@@ -1,4 +1,4 @@
-const APP_VERSION = "75";
+const APP_VERSION = "76";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1219,22 +1219,19 @@ function renderReport() {
   const paper = $("#reportPaper");
   if (!paper) return;
   const days = periodDays();
-  const rosterHead = `
-    <tr>
-      <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
-      ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
-    </tr>
-  `;
-  const rosterBody = state.employees.map((emp) => `
-    <tr>
-      <th class="name">${escapeHtml(emp.name)}</th>
-      ${days.map((date) => {
+  const nameHtml = (text) => escapeHtml(text).replace(" ", "<br>");
+  const rosterCells = [
+    `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
+    ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
+    ...state.employees.flatMap((emp) => [
+      `<div class="rt-name">${nameHtml(emp.name)}</div>`,
+      ...days.map((date) => {
         const type = state.schedule[toISODate(date)]?.[emp.id] || "";
         const cls = shiftClass(type, date);
-        return `<td><span class="cell ${cls}">${SHIFT_LABEL[type]}</span></td>`;
-      }).join("")}
-    </tr>
-  `).join("");
+        return `<div class="rt-shift cell ${cls}">${SHIFT_LABEL[type]}</div>`;
+      }),
+    ]),
+  ].join("");
 
   const payRows = state.employees.map((emp) => {
     const c = countShifts(emp.id);
@@ -1318,14 +1315,9 @@ function renderReport() {
     </header>
 
     <div class="excel-card report-roster">
-      <table class="roster" style="--rows:${state.employees.length};--days:${days.length}">
-        <colgroup>
-          <col class="name">
-          ${days.map(() => `<col>`).join("")}
-        </colgroup>
-        <thead>${rosterHead}</thead>
-        <tbody>${rosterBody}</tbody>
-      </table>
+      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(108px,1.15fr) repeat(${days.length},minmax(0,1fr));width:100%">
+        ${rosterCells}
+      </div>
     </div>
 
     <div class="excel-card report-pay">
@@ -1365,6 +1357,8 @@ function fitReportPaper() {
   const frame = paper?.closest(".report-frame");
   if (!paper || !frame || $("#reportView")?.hidden) return;
   paper.style.transform = "none";
+  const portrait = window.matchMedia("(orientation: portrait)").matches;
+  if (portrait) return;
   const width = Math.max(paper.scrollWidth, paper.offsetWidth, 1);
   const height = Math.max(paper.scrollHeight, paper.offsetHeight, 1);
   const scale = Math.min(frame.clientWidth / width, frame.clientHeight / height, 1);

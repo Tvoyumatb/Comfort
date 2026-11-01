@@ -1152,14 +1152,67 @@ input[type="number"] {
   font-size: 12px;
 }
 
-.report-paper .roster {
-  table-layout: fixed;
+.report-timesheet {
+  display: grid;
   width: 100%;
-  border-collapse: collapse;
+  min-width: 0;
+  background: #fff;
+  border-top: 1px solid #b4b4b4;
+  border-left: 1px solid #b4b4b4;
+  font-size: 11px;
 }
 
-.report-paper .roster col.name {
-  width: 22%;
+.report-timesheet > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  border-right: 1px solid #b4b4b4;
+  border-bottom: 1px solid #b4b4b4;
+}
+
+.report-timesheet .rt-head {
+  background: #f3f3f3;
+  font-weight: 700;
+  text-align: center;
+  padding: 5px 2px;
+  line-height: 1.2;
+}
+
+.report-timesheet .rt-name {
+  position: static;
+  z-index: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 4px 6px;
+  background: #fff;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.report-timesheet .rt-head.rt-name {
+  background: #f3f3f3;
+  justify-content: center;
+  text-align: center;
+}
+
+.report-timesheet .rt-shift {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  padding: 3px 1px;
+  font-size: 10px;
+  white-space: nowrap;
+  cursor: default;
 }
 
 .report-paper .report-pay {
@@ -1182,8 +1235,6 @@ input[type="number"] {
   height: auto;
 }
 
-.report-paper .roster th,
-.report-paper .roster td,
 .report-paper .pay th,
 .report-paper .pay td {
   padding: 6px 7px;
@@ -1194,17 +1245,6 @@ input[type="number"] {
   box-sizing: border-box;
 }
 
-.report-paper .roster th,
-.report-paper .roster td {
-  padding: 4px 3px;
-}
-
-.report-paper .roster th {
-  min-width: 0;
-  height: auto;
-  font-size: 11px;
-}
-
 .report-paper .pay th,
 .report-paper .pay td {
   padding: 6px 10px;
@@ -1212,7 +1252,6 @@ input[type="number"] {
   white-space: nowrap;
 }
 
-.report-paper .roster .name,
 .report-paper .pay .name {
   position: relative;
   z-index: 1;
@@ -1228,7 +1267,6 @@ input[type="number"] {
   background: #fff;
 }
 
-.report-paper .roster thead .name,
 .report-paper .pay thead .name {
   background: #f3f3f3;
 }
@@ -1247,6 +1285,13 @@ input[type="number"] {
   overflow: hidden;
   cursor: default;
   box-sizing: border-box;
+}
+
+.report-paper .report-timesheet .rt-shift.cell {
+  width: auto;
+  max-width: none;
+  min-height: 28px;
+  height: 100%;
 }
 
 .report-split {
