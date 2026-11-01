@@ -1,6 +1,6 @@
-const APP_VERSION = "70";
+const APP_VERSION = "71";
 const APP_NOTES = "Вернул табель, приход Rotana и сотрудников. Журнал больше не затирается пустой копией.";
-const RESTORE_URL = "./journal-restore.json?v=70";
+const RESTORE_URL = "./journal-restore.json?v=71";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -2699,6 +2699,324 @@ $("#incomeGroupButtons")?.addEventListener("click", (e) => {
   setTodayDefaults();
   renderTobacco();
   renderRevision();
+});
+
+let invoiceDrafts = [];
+let invoiceDraftMeta = { date: "", check: "", supplier: "Rotana" };
+
+function setScanStatus(text, show = true) {
+  const el = $("#scanStatus");
+  if (!el) return;
+  el.hidden = !show;
+  el.textContent = text || "";
+}
+
+function guessIncomeKind(name) {
+  const n = normalizeName(name);
+  if (/угол|coal|coco|cocoloco|bigmaks|коконар|том\s*коко|\d+\s*mm/.test(n)) return "coal";
+  if (/чаш|колб|калауд|мундштук|щипц|ершик|коврик|доска|фольг|шило|колпак|кадиллак|lotus|alpha bowl/.test(n)) {
+    return "inventory";
+  }
+  return "tobacco";
+}
+
+function parseInvoiceDate(text) {
+  const match = String(text || "").match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+  if (!match) return "";
+  const day = match[1].padStart(2, "0");
+  const month = match[2].padStart(2, "0");
+  let year = match[3];
+  if (year.length === 2) year = `20${year}`;
+  return `${year}-${month}-${day}`;
+}
+
+function parseInvoiceCheck(text) {
+  const match = String(text || "").match(/(?:чек|накладн|док(?:умент)?|№|#)\s*[:.]?\s*(\d{3,})/i)
+    || String(text || "").match(/\b(\d{5,})\b/);
+  return match ? match[1] : "";
+}
+
+function parseMoney(value) {
+  const clean = String(value || "").replace(/\s/g, "").replace(",", ".");
+  const num = Number(clean);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function parseInvoiceLines(text) {
+  const date = parseInvoiceDate(text) || new Date().toISOString().slice(0, 10);
+  const check = parseInvoiceCheck(text);
+  const supplier = /rotana|ротана/i.test(text) ? "Rotana" : "";
+  const rows = [];
+  String(text || "").split(/\n+/).forEach((line) => {
+    const clean = line.replace(/\s+/g, " ").trim();
+    if (clean.length < 6) return;
+    if (/итого|всего|сумма|накладн|поставщик|получател|дата|чек/i.test(clean) && !/\d{2,}\s+\d{3,}/.test(clean)) return;
+    const hit = clean.match(/^(.*?)(?:\s+(\d+(?:[.,]\d+)?))?\s+(\d[\d\s]{2,})$/);
+    if (!hit) return;
+    let product = hit[1].replace(/[-–]+$/g, "").trim();
+    const qty = parseMoney(hit[2] || "1");
+    const sum = parseMoney(hit[3]);
+    product = product.replace(/^\d+[.)]\s*/, "").trim();
+    if (product.length < 3 || sum < 100) return;
+    const kind = guessIncomeKind(product);
+    rows.push({
+      keep: true,
+      kind,
+      group: brandGroup(product),
+      product,
+      qty: kind === "coal" && qty <= 200 ? qty : Math.round(qty || 1),
+      packs: kind === "coal" ? Math.max(1, Math.round(qty || 1)) : 0,
+      sum,
+    });
+  });
+  invoiceDraftMeta = { date, check, supplier: supplier || "Rotana" };
+  invoiceDrafts = rows.length ? rows : [{
+    keep: true,
+    kind: "tobacco",
+    group: "classic",
+    product: "",
+    qty: 0,
+    packs: 1,
+    sum: 0,
+  }];
+}
+
+function renderInvoiceDraft() {
+  const box = $("#scanDraft");
+  if (!box) return;
+  if (!invoiceDrafts.length) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `
+    <p class="hint">Проверь, поправь если надо, и только потом запиши.</p>
+    <label>Дата
+      <input type="date" id="scanDate" value="${invoiceDraftMeta.date || ""}">
+    </label>
+    <label>Поставщик
+      <input type="text" id="scanSupplier" value="${escapeHtml(invoiceDraftMeta.supplier || "")}">
+    </label>
+    <label>Номер чека
+      <input type="text" id="scanCheck" value="${escapeHtml(invoiceDraftMeta.check || "")}">
+    </label>
+    <div class="scan-draft">
+      ${invoiceDrafts.map((row, index) => `
+        <div class="scan-row${row.keep ? "" : " is-off"}" data-scan-row="${index}">
+          <label class="scan-row-top">
+            <input type="checkbox" data-scan-keep="${index}" ${row.keep ? "checked" : ""}>
+            Записать эту строку
+          </label>
+          <label>Что это
+            <select data-scan-kind="${index}">
+              <option value="tobacco"${row.kind === "tobacco" ? " selected" : ""}>Табак</option>
+              <option value="inventory"${row.kind === "inventory" ? " selected" : ""}>Инвентарь</option>
+              <option value="coal"${row.kind === "coal" ? " selected" : ""}>Уголь</option>
+            </select>
+          </label>
+          <label ${row.kind === "tobacco" ? "" : "hidden"}>Тип
+            <select data-scan-group="${index}">
+              <option value="classic"${row.group === "classic" ? " selected" : ""}>Классик</option>
+              <option value="premium"${row.group === "premium" ? " selected" : ""}>Премиум</option>
+              <option value="fruit"${row.group === "fruit" ? " selected" : ""}>Фрукт</option>
+              <option value="tangiers"${row.group === "tangiers" ? " selected" : ""}>Tangiers</option>
+            </select>
+          </label>
+          <label>Название
+            <input type="text" data-scan-product="${index}" value="${escapeHtml(row.product)}">
+          </label>
+          <div class="row">
+            <label>${row.kind === "coal" ? "Пачек" : row.kind === "inventory" ? "Штук" : "Граммы"}
+              <input type="number" data-scan-qty="${index}" min="0" step="1" value="${row.kind === "coal" ? row.packs || row.qty : row.qty}">
+            </label>
+            <label>Сумма
+              <input type="number" data-scan-sum="${index}" min="0" step="1" value="${row.sum || 0}">
+            </label>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+    <div class="scan-actions">
+      <button type="button" class="primary" id="scanSave">Записать проверенное</button>
+      <button type="button" class="ghost" id="scanCancel">Отмена</button>
+    </div>
+  `;
+}
+
+function collectInvoiceDraft() {
+  invoiceDraftMeta.date = $("#scanDate")?.value || invoiceDraftMeta.date;
+  invoiceDraftMeta.supplier = $("#scanSupplier")?.value.trim() || "";
+  invoiceDraftMeta.check = $("#scanCheck")?.value.trim() || "";
+  invoiceDrafts = invoiceDrafts.map((row, index) => ({
+    ...row,
+    keep: Boolean(document.querySelector(`[data-scan-keep="${index}"]`)?.checked),
+    kind: document.querySelector(`[data-scan-kind="${index}"]`)?.value || row.kind,
+    group: document.querySelector(`[data-scan-group="${index}"]`)?.value || row.group,
+    product: document.querySelector(`[data-scan-product="${index}"]`)?.value.trim() || row.product,
+    qty: Number(document.querySelector(`[data-scan-qty="${index}"]`)?.value || 0),
+    packs: Number(document.querySelector(`[data-scan-qty="${index}"]`)?.value || 0),
+    sum: Number(document.querySelector(`[data-scan-sum="${index}"]`)?.value || 0),
+  }));
+}
+
+function clearInvoiceDraft() {
+  invoiceDrafts = [];
+  const box = $("#scanDraft");
+  const img = $("#scanPreview");
+  const photo = $("#invoicePhoto");
+  if (box) {
+    box.hidden = true;
+    box.innerHTML = "";
+  }
+  if (img) {
+    img.hidden = true;
+    img.removeAttribute("src");
+  }
+  if (photo) photo.value = "";
+  setScanStatus("", false);
+}
+
+function saveInvoiceDraft() {
+  collectInvoiceDraft();
+  const date = invoiceDraftMeta.date || new Date().toISOString().slice(0, 10);
+  const note = invoiceDraftMeta.check ? `чек ${invoiceDraftMeta.check}` : "фото накладной";
+  const supplier = invoiceDraftMeta.supplier;
+  const picked = invoiceDrafts.filter((row) => row.keep && row.product && Number(row.qty || row.packs) > 0);
+  if (!picked.length) {
+    window.alert("Нет строк для записи. Проверь галочки, название и количество.");
+    return;
+  }
+  picked.forEach((row) => {
+    if (row.kind === "tobacco") {
+      addTobaccoIncome({
+        date,
+        group: row.group,
+        product: row.product,
+        qty: row.qty,
+        sum: row.sum,
+        supplier,
+        note,
+      });
+      return;
+    }
+    if (row.kind === "coal") {
+      addCoalIncome({
+        date,
+        product: row.product,
+        packs: row.packs || row.qty,
+        perPack: coalsPerPack(),
+        sum: row.sum,
+        supplier,
+        note,
+      });
+      return;
+    }
+    const product = ensureStockItem(row.product).name;
+    state.tobacco.push({
+      id: uid(),
+      kind: "inventory",
+      date,
+      product,
+      supplier,
+      qty: Number(row.qty),
+      sum: Number(row.sum || 0),
+      note,
+    });
+  });
+  save();
+  incomingKind = picked[0].kind;
+  setTodayDefaults();
+  renderTobacco();
+  renderRevision();
+  clearInvoiceDraft();
+  setScanStatus(`Записал ${picked.length} поз. Проверь список ниже.`, true);
+}
+
+async function loadTesseract() {
+  if (window.Tesseract) return window.Tesseract;
+  await new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("ocr"));
+    document.head.appendChild(script);
+  });
+  return window.Tesseract;
+}
+
+function shrinkInvoiceImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const max = 1600;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.85);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("image"));
+    };
+    img.src = url;
+  });
+}
+
+async function scanInvoicePhoto(file) {
+  if (!file) return;
+  const preview = $("#scanPreview");
+  if (preview) {
+    preview.src = URL.createObjectURL(file);
+    preview.hidden = false;
+  }
+  setScanStatus("Читаю фото… это может занять полминуты", true);
+  try {
+    const Tesseract = await loadTesseract();
+    const image = await shrinkInvoiceImage(file);
+    const worker = await Tesseract.createWorker("rus+eng");
+    const result = await worker.recognize(image);
+    await worker.terminate();
+    parseInvoiceLines(result?.data?.text || "");
+    renderInvoiceDraft();
+    setScanStatus(
+      invoiceDrafts.some((row) => row.product)
+        ? "Проверь строки. Если что-то не то — поправь руками."
+        : "Текст прочитался плохо. Допиши строки руками и запиши.",
+      true
+    );
+  } catch {
+    setScanStatus("Не смог прочитать фото. Можно вписать позиции руками ниже.", true);
+    parseInvoiceLines("");
+    renderInvoiceDraft();
+  }
+}
+
+$("#invoicePhoto")?.addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  if (file) scanInvoicePhoto(file);
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target.id === "scanSave") {
+    saveInvoiceDraft();
+    return;
+  }
+  if (event.target.id === "scanCancel") {
+    clearInvoiceDraft();
+  }
+});
+
+document.addEventListener("change", (event) => {
+  const kind = event.target?.dataset?.scanKind;
+  if (kind == null) return;
+  collectInvoiceDraft();
+  renderInvoiceDraft();
 });
 
 $("#tobaccoForm").addEventListener("submit", (e) => {

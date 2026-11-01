@@ -1,4 +1,4 @@
-const CACHE = "journal-v70";
+const CACHE = "journal-v71";
 const FILES = [
   "./wallpaper-tangiers.jpg",
   "./tangiers-logo.png",

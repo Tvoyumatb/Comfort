@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=70">
+  <link rel="stylesheet" href="style.css?v=71">
   <script>
     window.forceJournalReload = function (btn) {
       if (window.__journalReloading) return;
@@ -209,6 +209,18 @@
       <div class="stats" id="tobaccoStats"></div>
       <div id="inventoryStock" hidden></div>
 
+      <div class="card form scan-card no-print">
+        <h2>Фото накладной</h2>
+        <p class="hint">Сфоткай чек на сайте. Я разберу позиции, ты проверишь и только потом можно записать.</p>
+        <label class="scan-pick">
+          Сфоткать или выбрать фото
+          <input type="file" id="invoicePhoto" accept="image/*" capture="environment" hidden>
+        </label>
+        <p class="scan-status" id="scanStatus" hidden></p>
+        <img id="scanPreview" class="scan-preview" alt="" hidden>
+        <div id="scanDraft" hidden></div>
+      </div>
+
       <form class="card form" id="tobaccoForm">
         <h2>Новый приход</h2>
         <label id="incomeKindWrap">Что пришло
@@ -324,7 +336,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=70"></script>
+  <script src="app.js?v=71"></script>
   <script>
     (function () {
       var startY = 0;
