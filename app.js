@@ -2961,9 +2961,9 @@ window.addEventListener("afterprint", () => {
 });
 
 if ("serviceWorker" in navigator) {
-  if (localStorage.getItem("journal-sw") !== "63") {
+  if (localStorage.getItem("journal-sw") !== "64") {
     caches.keys?.().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
-    localStorage.setItem("journal-sw", "63");
+    localStorage.setItem("journal-sw", "64");
   }
   navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
     reg.update();

@@ -1047,11 +1047,24 @@ input[type="number"] {
 
 .report-paper .roster,
 .report-paper .pay {
-  table-layout: fixed;
-  width: 100%;
   height: auto;
   min-width: 0;
   font-size: 12px;
+}
+
+.report-paper .roster {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.report-paper .report-pay {
+  width: max-content;
+  max-width: 100%;
+}
+
+.report-paper .pay {
+  table-layout: auto;
+  width: auto;
 }
 
 .report-paper .roster thead,
@@ -1079,10 +1092,11 @@ input[type="number"] {
   font-size: 11px;
 }
 
-.report-paper .pay th {
-  padding: 7px 6px;
+.report-paper .pay th,
+.report-paper .pay td {
+  padding: 6px 10px;
   font-size: 11px;
-  min-width: 0;
+  white-space: nowrap;
 }
 
 .report-paper .roster .name,
@@ -1090,7 +1104,7 @@ input[type="number"] {
   position: static;
   min-width: 168px;
   max-width: none;
-  width: 22%;
+  width: auto;
   padding: 6px 10px;
   font-size: 12px;
   line-height: 1.25;
@@ -1111,7 +1125,8 @@ input[type="number"] {
 
 .report-split {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: max-content max-content;
+  justify-content: start;
   gap: 14px;
   min-height: 0;
   height: auto;
