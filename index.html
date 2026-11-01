@@ -11,7 +11,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <link rel="stylesheet" href="style.css?v=72">
+  <link rel="stylesheet" href="style.css?v=73">
+  <style>#reloadBtn,.reload-site,.update-banner{display:none!important}</style>
   <script>
     window.forceJournalReload = function (btn) {
       if (window.__journalReloading) return;
@@ -60,11 +61,6 @@
       <button type="button" class="ghost" id="printBtn">Печать</button>
     </div>
   </header>
-
-  <div id="updateBanner" class="update-banner no-print" hidden>
-    <p id="updateText">Журнал обновился</p>
-    <button type="button" class="primary compact" id="updateOk">Понятно</button>
-  </div>
 
   <nav class="venues no-print" role="tablist" aria-label="Заведение">
     <button type="button" class="venue is-active" data-venue="tangiers">Tangiers</button>
@@ -329,7 +325,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=72"></script>
+  <script src="app.js?v=73"></script>
   <script>
     (function () {
       var startY = 0;

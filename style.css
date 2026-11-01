@@ -141,6 +141,12 @@ body[data-venue="shishka"]::before {
   cursor: pointer;
 }
 
+#reloadBtn,
+.reload-site,
+.update-banner {
+  display: none !important;
+}
+
 .pull-refresh {
   position: fixed;
   top: 0;

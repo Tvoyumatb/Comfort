@@ -1,6 +1,6 @@
-const APP_VERSION = "72";
-const APP_NOTES = "Вернул табель, приход Rotana и сотрудников. Журнал больше не затирается пустой копией.";
-const RESTORE_URL = "./journal-restore.json?v=72";
+const APP_VERSION = "73";
+const APP_NOTES = "";
+const RESTORE_URL = "./journal-restore.json?v=73";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -3301,22 +3301,7 @@ window.addEventListener("afterprint", () => {
   document.body.classList.remove("print-checklist", "print-report");
 });
 
-function showUpdateNote() {
-  if (localStorage.getItem("journal-seen") === APP_VERSION) return;
-  const banner = $("#updateBanner");
-  const text = $("#updateText");
-  if (text) text.textContent = `Журнал обновился. ${APP_NOTES}`;
-  if (banner) banner.hidden = false;
-}
-
-function dismissUpdateNote() {
-  localStorage.setItem("journal-seen", APP_VERSION);
-  const banner = $("#updateBanner");
-  if (banner) banner.hidden = true;
-}
-
-$("#updateOk")?.addEventListener("click", () => dismissUpdateNote());
-showUpdateNote();
+localStorage.setItem("journal-seen", APP_VERSION);
 
 if ("serviceWorker" in navigator) {
   if (localStorage.getItem("journal-sw") !== APP_VERSION) {
