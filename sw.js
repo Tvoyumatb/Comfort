@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v86 drop former-staff labels
+  // v87 remove leftover former-staff row
   event.waitUntil(self.skipWaiting());
 });
 

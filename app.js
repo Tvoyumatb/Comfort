@@ -1,4 +1,4 @@
-const APP_VERSION = "86";
+const APP_VERSION = "87";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -495,6 +495,7 @@ function normalizeVenue(data, venueId) {
     loungeBoughtV1: Boolean(data.loungeBoughtV1),
     loungeBoughtUndoV1: Boolean(data.loungeBoughtUndoV1),
   };
+  venue.employees = (venue.employees || []).filter((emp) => !isPlaceholderEmployee(emp));
   return applySplitClassicPack(applyMonthlyCount(applyStartInvoices(
     shiftOpeningDate(resetStock(applyConsumption(venue), venueId), venueId),
     venueId
@@ -708,6 +709,9 @@ function asJournal(raw) {
 }
 
 function applyRemote(remote, status) {
+  const dirty = Object.values(remote.venues || {}).some((venue) =>
+    (venue.employees || []).some(isPlaceholderEmployee)
+  );
   cloudApplying = true;
   applyCloud(remote);
   saveLocal();
@@ -716,6 +720,10 @@ function applyRemote(remote, status) {
   render();
   cloudApplying = false;
   setSyncStatus(status);
+  if (dirty) {
+    lastRemote = packedDb();
+    save();
+  }
 }
 
 function handleCloudMessage(text) {
@@ -1107,17 +1115,17 @@ function employeeById(id) {
   return (state.employees || []).find((emp) => emp.id === id);
 }
 
+function isPlaceholderEmployee(emp) {
+  const name = String(emp?.name || "").toLowerCase();
+  return /бывш/.test(name) || /уш[её]л/.test(name);
+}
+
 function empHasPeriodWork(emp) {
   return periodDays().some((date) => state.schedule[toISODate(date)]?.[emp.id]);
 }
 
 function visibleEmployees() {
-  const people = (state.employees || []).filter((emp) => emp.name !== "Бывший сотрудник");
-  if (people.length !== (state.employees || []).length) {
-    state.employees = people;
-    save();
-  }
-  return people.filter((emp) => !emp.leftOn || empHasPeriodWork(emp));
+  return (state.employees || []).filter((emp) => !emp.leftOn || empHasPeriodWork(emp));
 }
 
 function activeEmployees() {
@@ -1137,7 +1145,7 @@ function renderRoster() {
     <tr>
       <th class="name">
         ${escapeHtml(emp.name)}
-        ${emp.leftOn ? "" : `<button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>`}
+        <button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>
       </th>
       ${days.map((date) => {
         const iso = toISODate(date);
@@ -2601,8 +2609,12 @@ $("#rosterWrap").addEventListener("click", (e) => {
   const del = e.target.closest("[data-del-emp]");
   if (del) {
     const emp = state.employees.find((row) => row.id === del.dataset.delEmp);
-    if (!emp || !window.confirm(`Убрать ${emp.name} из текущего табеля? Старые смены сохранятся.`)) return;
-    emp.leftOn = todayISO();
+    if (!emp || !window.confirm(`Убрать ${emp.name} из табеля?`)) return;
+    if (emp.leftOn || isPlaceholderEmployee(emp)) {
+      state.employees = state.employees.filter((row) => row.id !== emp.id);
+    } else {
+      emp.leftOn = todayISO();
+    }
     save();
     renderShifts();
   }
