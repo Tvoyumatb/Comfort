@@ -915,26 +915,6 @@ input[type="number"] {
   padding: 28px 10px;
 }
 
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.chip {
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #111;
-}
-
-.chip.morning { background: #fff200; color: #111; }
-.chip.evening-wd { background: #c00000; color: #fff; }
-.chip.evening-we { background: #0070c0; color: #fff; }
-.chip.intern { background: #c65911; color: #fff; }
-
 .rates {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -949,6 +929,11 @@ input[type="number"] {
   font-weight: 700;
   color: #111;
 }
+
+.rate.morning { background: #fff200; color: #111; }
+.rate.evening-wd { background: #c00000; color: #fff; }
+.rate.evening-we { background: #0070c0; color: #fff; }
+.rate.intern { background: #c65911; color: #fff; }
 
 .rate input {
   width: 100%;

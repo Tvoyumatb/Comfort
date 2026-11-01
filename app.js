@@ -1,6 +1,6 @@
-const APP_VERSION = "71";
+const APP_VERSION = "72";
 const APP_NOTES = "Вернул табель, приход Rotana и сотрудников. Журнал больше не затирается пустой копией.";
-const RESTORE_URL = "./journal-restore.json?v=71";
+const RESTORE_URL = "./journal-restore.json?v=72";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -1085,17 +1085,17 @@ function renderPeriod() {
 
 function renderRates() {
   $("#ratesBox").innerHTML = `
-    <label class="rate morning">Утро, сум
+    <label class="rate morning">Утро с 11:30
       <input type="number" min="0" step="1000" data-rate="morning" value="${state.rates.morning}">
     </label>
-    <label class="rate intern">Стажировка, сум
-      <input type="number" min="0" step="1000" data-rate="intern" value="${state.rates.intern}">
-    </label>
-    <label class="rate evening-wd">Вечер будни, сум
+    <label class="rate evening-wd">Вечер будни пн–чт с 18:00
       <input type="number" min="0" step="1000" data-rate="eveningWeekday" value="${state.rates.eveningWeekday}">
     </label>
-    <label class="rate evening-we">Вечер выходные, сум
+    <label class="rate evening-we">Вечер выходные пт–вс
       <input type="number" min="0" step="1000" data-rate="eveningWeekend" value="${state.rates.eveningWeekend}">
+    </label>
+    <label class="rate intern">Стажировка
+      <input type="number" min="0" step="1000" data-rate="intern" value="${state.rates.intern}">
     </label>
   `;
 }
