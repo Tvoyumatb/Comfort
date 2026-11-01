@@ -11,15 +11,35 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-192.png">
   <title>Отчёты: смены и табак</title>
-  <meta http-equiv="Cache-Control" content="no-store">
-  <link rel="stylesheet" href="style.css?v=74">
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
   <style>#reloadBtn,.reload-site,.update-banner{display:none!important}</style>
   <script>
-    window.forceJournalReload = function () {
-      if (window.__journalReloading) return;
-      window.__journalReloading = true;
-      location.reload();
-    };
+    (function () {
+      var params = new URLSearchParams(location.search);
+      window.forceJournalReload = function () {
+        params.set("n", Date.now());
+        location.replace(location.pathname + "?" + params.toString() + location.hash);
+      };
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then(function (reg) {
+          return reg.update();
+        }).catch(function () {});
+      }
+      if (!params.get("n")) {
+        window.forceJournalReload();
+        return;
+      }
+      var css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "style.css?n=" + params.get("n");
+      document.head.appendChild(css);
+      window.addEventListener("DOMContentLoaded", function () {
+        var script = document.createElement("script");
+        script.src = "app.js?n=" + params.get("n");
+        document.body.appendChild(script);
+      });
+    })();
   </script>
 </head>
 <body>
@@ -302,7 +322,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=74"></script>
   <script>
     (function () {
       var startY = 0;

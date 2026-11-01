@@ -1,6 +1,6 @@
-const APP_VERSION = "74";
+const APP_VERSION = "75";
 const APP_NOTES = "";
-const RESTORE_URL = "./journal-restore.json?v=74";
+const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
@@ -3304,14 +3304,13 @@ window.addEventListener("afterprint", () => {
 localStorage.setItem("journal-seen", APP_VERSION);
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations?.().then((regs) => {
-    (regs || []).forEach((reg) => reg.unregister());
+  navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
+    reg.update();
   }).catch(() => {});
 }
 if (window.caches?.keys) {
   caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))).catch(() => {});
 }
-localStorage.removeItem("journal-sw");
 
 ["gesturestart", "gesturechange", "gestureend"].forEach((type) => {
   document.addEventListener(type, (event) => event.preventDefault(), { passive: false });
