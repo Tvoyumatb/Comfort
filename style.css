@@ -977,7 +977,7 @@ input[type="number"] {
   position: fixed;
   top: 6px;
   right: 8px;
-  z-index: 3;
+  z-index: 80;
   padding: 0;
   background: transparent;
   border: 0;
@@ -1226,6 +1226,27 @@ body.report-open::before {
 
   .report-paper:not(:has(.report-split section)) {
     grid-template-rows: auto minmax(0, 1.8fr) minmax(0, 1fr);
+  }
+
+  .report-bar {
+    top: auto;
+    right: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 80;
+    padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+    background: #fff;
+  }
+
+  .report-bar .ghost {
+    display: block;
+    width: 100%;
+    padding: 14px 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #111;
+    border: 1px solid #111;
+    background: #fff;
   }
 }
 
