@@ -1,6 +1,6 @@
-const APP_VERSION = "69";
+const APP_VERSION = "70";
 const APP_NOTES = "Вернул табель, приход Rotana и сотрудников. Журнал больше не затирается пустой копией.";
-const RESTORE_URL = "./journal-restore.json?v=69";
+const RESTORE_URL = "./journal-restore.json?v=70";
 const KEY = "shop-reports-v4";
 const OLD_KEY = "shop-reports-v3";
 const MQTT_TOPIC = "comfort/tvoyumatb/journal/v1";
