@@ -23,12 +23,15 @@
   </style>
   <script>
     (function () {
-      var BUILD = "88";
+      var BUILD = "89";
       var params = new URLSearchParams(location.search);
-      function scrubJournal() {
-        try {
-          var raw = localStorage.getItem("shop-reports-v4");
-          if (!raw) return;
+      window.forceJournalReload = function () {
+        params.set("n", Date.now());
+        location.replace(location.pathname + "?" + params.toString() + location.hash);
+      };
+      try {
+        var raw = localStorage.getItem("shop-reports-v4");
+        if (raw) {
           var db = JSON.parse(raw);
           var changed = false;
           Object.keys(db.venues || {}).forEach(function (key) {
@@ -44,46 +47,28 @@
             }
           });
           if (changed) localStorage.setItem("shop-reports-v4", JSON.stringify(db));
-        } catch (err) {}
-      }
-      function loadAssets() {
-        var stamp = params.get("n") || Date.now();
-        var css = document.createElement("link");
-        css.rel = "stylesheet";
-        css.href = "style.css?v=" + BUILD + "&n=" + stamp;
-        document.head.appendChild(css);
-        window.addEventListener("DOMContentLoaded", function () {
-          var script = document.createElement("script");
-          script.src = "app.js?v=" + BUILD + "&n=" + stamp;
-          document.body.appendChild(script);
-        });
-      }
-      window.forceJournalReload = function () {
-        params.set("n", Date.now());
-        params.set("b", BUILD);
-        location.replace(location.pathname + "?" + params.toString() + location.hash);
-      };
-      scrubJournal();
-      var jobs = [];
-      if ("serviceWorker" in navigator) {
-        jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
-          return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
-        }).catch(function () {}));
-      }
-      if (window.caches && caches.keys) {
-        jobs.push(caches.keys().then(function (keys) {
-          return Promise.all(keys.map(function (key) { return caches.delete(key); }));
-        }).catch(function () {}));
-      }
-      var ready = Promise.all(jobs);
-      var timeout = new Promise(function (resolve) { setTimeout(resolve, 900); });
-      Promise.race([ready, timeout]).then(function () {
-        if (params.get("b") !== BUILD) {
-          window.forceJournalReload();
-          return;
         }
-        loadAssets();
-      });
+      } catch (err) {}
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (reg) { reg.unregister(); });
+        }).catch(function () {});
+      }
+      if (!params.get("n")) {
+        window.forceJournalReload();
+        return;
+      }
+      var css = document.createElement("link");
+      css.rel = "stylesheet";
+      css.href = "style.css?v=" + BUILD + "&n=" + params.get("n");
+      document.head.appendChild(css);
+      function addScript() {
+        var script = document.createElement("script");
+        script.src = "app.js?v=" + BUILD + "&n=" + params.get("n");
+        (document.body || document.documentElement).appendChild(script);
+      }
+      if (document.body) addScript();
+      else document.addEventListener("DOMContentLoaded", addScript);
     })();
   </script>
 </head>

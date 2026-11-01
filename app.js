@@ -1,4 +1,4 @@
-const APP_VERSION = "88";
+const APP_VERSION = "89";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
