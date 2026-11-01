@@ -307,9 +307,29 @@ body[data-venue="shishka"] .venue[data-venue="shishka"].is-active {
   grid-template-columns: repeat(4, 1fr);
 }
 
-.tabs-4 .tab {
-  padding: 11px 6px;
-  font-size: 13px;
+.tabs-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.tabs-4 .tab,
+.tabs-5 .tab {
+  padding: 11px 4px;
+  font-size: 12px;
+}
+
+.tab-badge {
+  display: inline-flex;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #c45c4a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 16px;
+  vertical-align: middle;
 }
 
 .tab, .ghost, .primary, .icon-btn, .danger {
@@ -328,6 +348,7 @@ body[data-venue="shishka"] .venue[data-venue="shishka"].is-active {
 .tab[data-tab="shifts"] { border: 1px solid #fff200; }
 .tab[data-tab="revision"] { border: 1px solid var(--tangiers); }
 .tab[data-tab="tobacco"] { border: 1px solid var(--inventory); }
+.tab[data-tab="lounge"] { border: 1px solid #e8a54b; }
 .tab[data-tab="checklist"] { border: 1px solid #7ab8ff; }
 
 .tab.is-active {
@@ -339,6 +360,7 @@ body[data-venue="shishka"] .venue[data-venue="shishka"].is-active {
 .tab[data-tab="shifts"].is-active { background: #fff200; }
 .tab[data-tab="revision"].is-active { background: var(--tangiers); color: #fff; }
 .tab[data-tab="tobacco"].is-active { background: var(--inventory); color: #102422; }
+.tab[data-tab="lounge"].is-active { background: #e8a54b; color: #1a1510; }
 .tab[data-tab="checklist"].is-active { background: #7ab8ff; }
 
 main {
@@ -1551,6 +1573,29 @@ body.report-open::before {
   .report-paper .report-timesheet .rt-shift.cell {
     min-height: 24px;
   }
+}
+
+.lounge-alert {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #c45c4a;
+  background: rgba(196, 92, 74, 0.18);
+  color: #ffd7d0;
+}
+
+.lounge-alert p {
+  margin: 0 0 6px;
+  font-weight: 800;
+}
+
+.lounge-alert ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.lounge-alert li {
+  margin: 4px 0;
 }
 
 .stock-table input {

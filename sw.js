@@ -1,5 +1,5 @@
 self.addEventListener("install", (event) => {
-  // v80 native layout per report kind
+  // v81 lounge tab and monthly revision
   event.waitUntil(self.skipWaiting());
 });
 

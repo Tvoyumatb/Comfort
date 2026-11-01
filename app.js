@@ -1,4 +1,4 @@
-const APP_VERSION = "80";
+const APP_VERSION = "81";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1167,10 +1167,9 @@ function renderPay() {
 }
 
 function renderFines() {
-  const days = periodDays();
   const rows = (state.fines || [])
-    .filter((f) => inCurrentPeriod(f.date))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   const empSelect = $("#fineEmpSelect");
   if (empSelect) {
     empSelect.innerHTML = state.employees
@@ -1180,12 +1179,14 @@ function renderFines() {
   const dateInput = document.querySelector('#fineForm [name="date"]');
   if (dateInput && !dateInput.value) dateInput.value = toISODate(new Date());
   fillDatalist("#fineWhatList", ensureInventory().map((item) => item.name));
+  const list = $("#fineList");
+  if (!list) return;
 
   if (!rows.length) {
-    $("#fineList").innerHTML = `<p class="empty">Порчи за ${days[0].getDate()}–${days[days.length - 1].getDate()} число пока нет</p>`;
+    list.innerHTML = `<p class="empty">Порчи пока нет</p>`;
     return;
   }
-  $("#fineList").innerHTML = rows.map((f) => {
+  list.innerHTML = rows.map((f) => {
     const emp = state.employees.find((e) => e.id === f.empId);
     return `
       <article class="card item">
@@ -1607,14 +1608,21 @@ function ensureRevision(date) {
   const iso = date || toISODate(viewRevMonth);
   let rev = revisionForMonth(iso);
   if (!rev) {
+    const prev = prevMonthRevision(iso);
     rev = {
       date: clampDateToMonth(iso, iso),
+      month: monthKey(parseISODate(iso)),
       coals: 0,
-      items: [],
+      items: (prev?.items || []).map((item) => ({
+        name: item.name,
+        group: item.group || brandGroup(item.name),
+        grams: 0,
+      })),
     };
     state.revisions.push(rev);
     save();
   } else {
+    if (!rev.month) rev.month = monthKey(parseISODate(rev.date));
     if (fillRevisionBrands(rev)) save();
   }
   return rev;
@@ -1932,6 +1940,58 @@ function stockNow(item) {
   return Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
 }
 
+function stockTarget(item) {
+  return Math.max(Number(item.start || 0), 3);
+}
+
+function stockNeedsBuy(item) {
+  const now = stockNow(item);
+  const fines = fineQtyFor(item.name);
+  if (now <= 2) return true;
+  if (item.alert && now < stockTarget(item)) return true;
+  if (fines > 0 && now < stockTarget(item)) return true;
+  return false;
+}
+
+function stockAlertReason(item) {
+  const now = stockNow(item);
+  const fines = fineQtyFor(item.name);
+  if (now <= 0) return "нет в наличии";
+  if (fines > 0 && now < stockTarget(item)) return `порча ${fines} шт, осталось ${now}`;
+  if (now <= 2) return `мало: ${now} ${stockUnit(item)}`;
+  return "нужно закупить";
+}
+
+function loungeAlertRows() {
+  const inv = ensureInventory()
+    .filter((item) => stockNeedsBuy(item))
+    .map((item) => ({
+      name: item.name,
+      now: stockNow(item),
+      unit: stockUnit(item),
+      reason: stockAlertReason(item),
+      restock: item.name,
+      coal: false,
+    }));
+  const coal = ensureCoalStock()
+    .filter((item) => coalNow(item) <= 0)
+    .map((item) => ({
+      name: item.name,
+      now: coalNow(item),
+      unit: "шт",
+      reason: "уголь закончился",
+      restock: item.name,
+      coal: true,
+    }));
+  return [...inv, ...coal];
+}
+
+function clearStockWatch(name) {
+  const item = ensureInventory().find((row) => row.name.toLowerCase() === String(name || "").toLowerCase());
+  if (!item) return;
+  if (stockNow(item) >= stockTarget(item)) item.alert = false;
+}
+
 function coalNow(item) {
   return Number(item.start || 0) + incomingQtyFor(item.name, "coal");
 }
@@ -1953,6 +2013,7 @@ function stockUnit(item) {
 function isEmptyRevision(rev) {
   if (!rev) return true;
   if (rev.date === OPENING_DATE) return false;
+  if ((rev.items || []).length) return false;
   return revisionTotal(rev) === 0 && Number(rev.coals || 0) === 0;
 }
 
@@ -2237,7 +2298,7 @@ function renderStockRows(items, { restockAttr, startAttr, delAttr, extraCols, co
     const extra = extraCols(item);
     const now = extra.now;
     return `
-      <tr class="${now <= 2 ? "low-stock" : ""}">
+      <tr class="${now <= 2 || extra.watch ? "low-stock" : ""}">
         <th class="name">${escapeHtml(item.name)}</th>
         <td><input type="number" min="0" step="1" inputmode="numeric" value="${item.start || 0}" ${startAttr}="${item.id}"></td>
         ${extra.mid}
@@ -2251,53 +2312,33 @@ function renderStockRows(items, { restockAttr, startAttr, delAttr, extraCols, co
   }).join("");
 }
 
+function renderLoungeAlerts() {
+  const box = $("#loungeAlerts");
+  const badge = $("#loungeBadge");
+  const rows = loungeAlertRows();
+  if (badge) {
+    badge.hidden = !rows.length;
+    badge.textContent = rows.length ? String(rows.length) : "";
+  }
+  if (!box) return;
+  if (!rows.length) {
+    box.innerHTML = "";
+    return;
+  }
+  box.innerHTML = `
+    <div class="lounge-alert">
+      <p>Нужно закупить и вернуть:</p>
+      <ul>
+        ${rows.map((row) => `<li><strong>${escapeHtml(row.name)}</strong> — ${escapeHtml(row.reason)}</li>`).join("")}
+      </ul>
+    </div>
+  `;
+}
+
 function renderInventoryStock() {
   const box = $("#inventoryStock");
   if (!box) return;
-  const show = incomingKind === "inventory" || incomingKind === "coal";
-  box.hidden = !show;
-  if (!show) return;
-  if (incomingKind === "coal") {
-    const stock = ensureCoalStock();
-    box.innerHTML = `
-      <h2 class="block-title">Виды угля</h2>
-      <div class="excel-card">
-        <table class="pay stock-table">
-          <thead>
-            <tr>
-              <th class="name">Название</th>
-              <th>Изначально, шт</th>
-              <th>Приход, шт</th>
-              <th>Сейчас</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${renderStockRows(stock, {
-              restockAttr: "data-restock-coal",
-              startAttr: "data-coal-start",
-              delAttr: "data-del-coal-stock",
-              colCount: 5,
-              extraCols: (item) => {
-                const income = incomingQtyFor(item.name, "coal");
-                return {
-                  now: coalNow(item),
-                  unit: "шт",
-                  mid: `<td>${formatGrams(income)}</td>`,
-                };
-              },
-            })}
-          </tbody>
-        </table>
-      </div>
-      <form class="add-brand" id="addCoalStockForm">
-        <input type="text" name="name" placeholder="Добавить название угля" required>
-        <button type="submit" class="primary compact">+</button>
-      </form>
-      <p class="hint">Продажи кальянов минусуют общий остаток углей в ревизии. Здесь видно, сколько какого вида завезли.</p>
-    `;
-    return;
-  }
+  box.hidden = false;
   const stock = ensureInventory();
   const bowls = stock.filter((item) => stockKind(item) === "bowl");
   const rest = stock.filter((item) => stockKind(item) !== "bowl");
@@ -2307,6 +2348,7 @@ function renderInventoryStock() {
     return {
       now: stockNow(item),
       unit: stockUnit(item),
+      watch: stockNeedsBuy(item),
       mid: `<td>${income}</td><td>${fines}</td>`,
     };
   };
@@ -2339,11 +2381,53 @@ function renderInventoryStock() {
       <button type="submit" class="primary compact">+</button>
     </form>
   `;
+  const coal = ensureCoalStock();
   box.innerHTML = `
     ${table("Чаши", bowls, "Название чаши, например Solaris", "bowl")}
-    ${table("Остальной инвентарь", rest, "Добавить позицию, например колба", "item")}
-    <p class="hint">Сейчас = изначально + приход − порча. Мундштуки считаются пачками и с кальянов не списываются.</p>
+    ${table("Инвентарь зала", rest, "Добавить позицию, например колба", "item")}
+    <h2 class="block-title">Виды угля</h2>
+    <div class="excel-card">
+      <table class="pay stock-table">
+        <thead>
+          <tr>
+            <th class="name">Название</th>
+            <th>Изначально, шт</th>
+            <th>Приход, шт</th>
+            <th>Сейчас</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${renderStockRows(coal, {
+            restockAttr: "data-restock-coal",
+            startAttr: "data-coal-start",
+            delAttr: "data-del-coal-stock",
+            colCount: 5,
+            extraCols: (item) => {
+              const income = incomingQtyFor(item.name, "coal");
+              return {
+                now: coalNow(item),
+                unit: "шт",
+                watch: coalNow(item) <= 0,
+                mid: `<td>${formatGrams(income)}</td>`,
+              };
+            },
+          })}
+        </tbody>
+      </table>
+    </div>
+    <form class="add-brand" id="addCoalStockForm">
+      <input type="text" name="name" placeholder="Добавить название угля" required>
+      <button type="submit" class="primary compact">+</button>
+    </form>
+    <p class="hint">Сейчас = изначально + приход − порча. Мундштуки — пачками.</p>
   `;
+}
+
+function renderLounge() {
+  renderLoungeAlerts();
+  renderInventoryStock();
+  renderFines();
 }
 
 function ensureChecklist() {
@@ -2394,6 +2478,7 @@ function render() {
   renderShifts();
   renderRevision();
   renderTobacco();
+  renderLounge();
   renderChecklist();
 }
 
@@ -2471,7 +2556,8 @@ $("#fineForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
   const what = data.what.trim();
-  ensureStockItem(what);
+  const item = ensureStockItem(what);
+  item.alert = true;
   if (!Array.isArray(state.fines)) state.fines = [];
   state.fines.push({
     id: uid(),
@@ -2486,7 +2572,7 @@ $("#fineForm").addEventListener("submit", (e) => {
   e.target.reset();
   setTodayDefaults();
   renderShifts();
-  if (incomingKind === "inventory") renderInventoryStock();
+  renderLounge();
 });
 
 $("#addEmployeeForm").addEventListener("submit", (e) => {
@@ -3209,6 +3295,7 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
       sum: Number(data.sum || 0),
       note: (data.note || "").trim(),
     });
+    if (kind === "inventory") clearStockWatch(product);
   }
   save();
   e.target.reset();
@@ -3216,6 +3303,7 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   setTodayDefaults();
   renderTobacco();
   renderRevision();
+  renderLounge();
 });
 
 document.addEventListener("click", (e) => {
@@ -3237,7 +3325,7 @@ document.addEventListener("click", (e) => {
     state.fines = (state.fines || []).filter((f) => f.id !== fineId);
     save();
     renderShifts();
-    if (incomingKind === "inventory") renderInventoryStock();
+    renderLounge();
   }
   const restock = e.target.dataset.restock;
   if (restock) {
@@ -3263,14 +3351,14 @@ document.addEventListener("click", (e) => {
   if (stockId) {
     state.inventoryStock = ensureInventory().filter((item) => item.id !== stockId);
     save();
-    renderInventoryStock();
+    renderLounge();
     renderTobacco();
   }
   const coalStockId = e.target.dataset.delCoalStock;
   if (coalStockId) {
     state.coalStock = ensureCoalStock().filter((item) => item.id !== coalStockId);
     save();
-    renderInventoryStock();
+    renderLounge();
     renderTobacco();
   }
 });
@@ -3284,6 +3372,7 @@ document.addEventListener("input", (e) => {
     save();
     const cell = e.target.closest("tr")?.querySelector(".sum");
     if (cell) cell.textContent = `${stockNow(item)} ${stockUnit(item)}`;
+    renderLoungeAlerts();
     return;
   }
   const coalId = e.target.dataset.coalStart;
@@ -3312,6 +3401,7 @@ document.addEventListener("submit", (e) => {
     ensureCoalItem(name);
     save();
     e.target.reset();
+    renderLounge();
     renderTobacco();
     return;
   }
@@ -3322,6 +3412,7 @@ document.addEventListener("submit", (e) => {
   ensureStockItem(name, e.target.dataset.stockKind || "item");
   save();
   e.target.reset();
+  renderLounge();
   renderTobacco();
 });
 

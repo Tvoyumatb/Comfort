@@ -39,11 +39,11 @@
       }
       var css = document.createElement("link");
       css.rel = "stylesheet";
-      css.href = "style.css?v=80&n=" + params.get("n");
+      css.href = "style.css?v=81&n=" + params.get("n");
       document.head.appendChild(css);
       window.addEventListener("DOMContentLoaded", function () {
         var script = document.createElement("script");
-        script.src = "app.js?v=80&n=" + params.get("n");
+        script.src = "app.js?v=81&n=" + params.get("n");
         document.body.appendChild(script);
       });
     })();
@@ -71,10 +71,11 @@
     <button type="button" class="venue" data-venue="shishka">Shishka Premium</button>
   </nav>
 
-  <nav class="tabs tabs-4 no-print" role="tablist">
+  <nav class="tabs tabs-5 no-print" role="tablist">
     <button type="button" class="tab is-active" data-tab="shifts" role="tab" aria-selected="true">Табель</button>
     <button type="button" class="tab" data-tab="revision" role="tab" aria-selected="false">Ревизия</button>
     <button type="button" class="tab" data-tab="tobacco" role="tab" aria-selected="false">Приход</button>
+    <button type="button" class="tab" data-tab="lounge" role="tab" aria-selected="false">Зал <span class="tab-badge" id="loungeBadge" hidden></span></button>
     <button type="button" class="tab" data-tab="checklist" role="tab" aria-selected="false">Лист</button>
   </nav>
 
@@ -103,32 +104,7 @@
       <h2 class="block-title">Расчёт за период</h2>
       <div class="excel-card pay-wrap" id="payWrap"></div>
 
-      <h2 class="block-title">Порча — колба, чаша и другое</h2>
-      <p class="hint">Штраф в таблице выше — за опоздание. Здесь списывается инвентарь: колба, чаша и т.д.</p>
-      <form class="card form" id="fineForm">
-        <label>Сотрудник
-          <select name="empId" id="fineEmpSelect" required></select>
-        </label>
-        <label>Что испортили
-          <input type="text" name="what" list="fineWhatList" placeholder="Колба, чаша..." required>
-        </label>
-        <datalist id="fineWhatList"></datalist>
-        <label>Дата
-          <span class="date-wrap">
-            <input type="date" name="date" required>
-          </span>
-        </label>
-        <div class="row">
-          <label>Штук
-            <input type="number" name="qty" min="1" step="1" value="1" required>
-          </label>
-          <label>Сумма
-            <input type="number" name="sum" min="0" step="1000" required>
-          </label>
-        </div>
-        <button type="submit" class="primary">Добавить порчу</button>
-      </form>
-      <div class="list" id="fineList"></div>
+      <p class="hint">Порча колбы, чаши и прочего — во вкладке Зал. Там же остатки и напоминание закупить.</p>
     </section>
 
     <section id="revision" class="panel" role="tabpanel" hidden>
@@ -136,7 +112,7 @@
         <button type="button" class="icon-btn" id="prevRevMonth" aria-label="Предыдущий месяц">‹</button>
         <div class="period-label">
           <strong id="revMonthLabel">—</strong>
-          <span>Только остаток по снятию. Чеки — во вкладке Приход</span>
+          <span>Каждый месяц свой снимок. Не смешивается с другими</span>
         </div>
         <button type="button" class="icon-btn" id="nextRevMonth" aria-label="Следующий месяц">›</button>
       </div>
@@ -201,7 +177,6 @@
       </div>
 
       <div class="stats" id="tobaccoStats"></div>
-      <div id="inventoryStock" hidden></div>
 
       <div class="card form scan-card no-print">
         <h2>Фото накладной</h2>
@@ -292,6 +267,43 @@
       </form>
 
       <div class="list" id="tobaccoList"></div>
+    </section>
+
+    <section id="lounge" class="panel" role="tabpanel" hidden>
+      <div class="period-bar">
+        <p class="period-label">
+          <strong>Кальянная</strong>
+          <span>Остатки зала, порча и что нужно закупить</span>
+        </p>
+      </div>
+      <div id="loungeAlerts"></div>
+      <p class="hint">Порча сразу минусует. Приход инвентаря плюсует. Красное висит, пока не закупишь и не вернёшь на место.</p>
+      <div id="inventoryStock"></div>
+      <h2 class="block-title">Порча</h2>
+      <form class="card form" id="fineForm">
+        <label>Сотрудник
+          <select name="empId" id="fineEmpSelect" required></select>
+        </label>
+        <label>Что испортили
+          <input type="text" name="what" list="fineWhatList" placeholder="Колба, чаша..." required>
+        </label>
+        <datalist id="fineWhatList"></datalist>
+        <label>Дата
+          <span class="date-wrap">
+            <input type="date" name="date" required>
+          </span>
+        </label>
+        <div class="row">
+          <label>Штук
+            <input type="number" name="qty" min="1" step="1" value="1" required>
+          </label>
+          <label>Сумма
+            <input type="number" name="sum" min="0" step="1000" required>
+          </label>
+        </div>
+        <button type="submit" class="primary">Добавить порчу</button>
+      </form>
+      <div class="list" id="fineList"></div>
     </section>
 
     <section id="checklist" class="panel" role="tabpanel" hidden>
