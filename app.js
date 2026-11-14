@@ -1,4 +1,4 @@
-const APP_VERSION = "100";
+const APP_VERSION = "101";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1005,11 +1005,16 @@ function formatSum(n) {
 }
 
 function unique(list, field) {
-  return [...new Set(list.map((x) => x[field]).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru"));
+  return sortBrandNames(list.map((x) => x[field]));
+}
+
+function sortBrandNames(names) {
+  return [...new Set((names || []).map((name) => String(name || "").trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "ru", { sensitivity: "base", numeric: true }));
 }
 
 function fillDatalist(id, values) {
-  $(id).innerHTML = values.map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
+  $(id).innerHTML = sortBrandNames(values).map((v) => `<option value="${escapeHtml(v)}"></option>`).join("");
 }
 
 function escapeHtml(str) {
@@ -1581,7 +1586,9 @@ function renderRevisionReport() {
   const { month, snap } = revisionReportLabel(rev);
   let itemCount = 0;
   const cols = groups.map((group) => {
-    const rows = (rev.items || []).filter((item) => itemGroup(item) === group.id);
+    const rows = (rev.items || [])
+      .filter((item) => itemGroup(item) === group.id)
+      .sort((a, b) => a.name.localeCompare(b.name, "ru", { sensitivity: "base", numeric: true }));
     if (!rows.length) return "";
     itemCount += rows.length;
     const income = incomeGramsForGroup(group.id, rev.date);
@@ -2434,7 +2441,8 @@ function renderRevision() {
     .map((group) => {
       const rows = rev.items
         .map((item, index) => ({ item, index }))
-        .filter(({ item }) => itemGroup(item) === group.id);
+        .filter(({ item }) => itemGroup(item) === group.id)
+        .sort((a, b) => a.item.name.localeCompare(b.item.name, "ru", { sensitivity: "base", numeric: true }));
       if (!rows.length) return "";
       const income = incomeGramsForGroup(group.id, snap);
       const used = usedGramsForGroup(rev, group.id, snap);
@@ -2503,7 +2511,7 @@ function allTobaccoBrandNames() {
   (state.tobacco || [])
     .filter((row) => (row.kind || "tobacco") === "tobacco")
     .forEach((row) => add(row.product));
-  return [...seen.values()].sort((a, b) => a.localeCompare(b, "ru"));
+  return sortBrandNames([...seen.values()]);
 }
 
 function fillPackBrandSelect() {
@@ -2749,7 +2757,7 @@ function renderTobacco() {
   const extras = incomingKind === "tobacco" ? allTobaccoBrandNames() : incomingKind === "inventory"
     ? ensureInventory().map((item) => item.name)
     : ensureCoalStock().map((item) => item.name);
-  fillDatalist("#productsList", [...new Set([...extras, ...names])]);
+  fillDatalist("#productsList", [...extras, ...names]);
   fillDatalist("#suppliersList", unique(incomingRows(), "supplier"));
   fillDatalist("#coalNamesList", ensureCoalStock().map((item) => item.name));
   renderInventoryStock();
