@@ -915,6 +915,26 @@ input[type="number"] {
   font-size: 12px;
 }
 
+.rev-income {
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, #c4a574 8%, var(--card));
+}
+
+.rev-income .sheet-caption {
+  background: transparent;
+}
+
+.rev-income .sheet-row strong {
+  color: #b8f0c9;
+}
+
+.rev-in {
+  display: block;
+  color: #8fd4a8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .rev-empty {
   margin: 0;
   padding: 8px 14px 12px;
@@ -1347,7 +1367,7 @@ input[type="number"] {
 }
 
 .rev-shot-foot col.num {
-  width: 25%;
+  width: 18%;
 }
 
 .report-paper.rev-shot.is-dense .rev-shot-sheet {

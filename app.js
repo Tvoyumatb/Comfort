@@ -1,4 +1,4 @@
-const APP_VERSION = "96";
+const APP_VERSION = "97";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -132,7 +132,7 @@ const MONTHS_RU = [
 const INCOME = {
   tobacco: {
     title: "Приход табака",
-    hint: "Только чеки, которые скинул. Это не ревизия — забытые накладные сюда можно не догонять",
+    hint: "Чеки и коробки. Табак и уголь этого месяца видны во вкладке Ревизия",
     name: "Марка",
     placeholder: "Например Starline",
     qty: "Граммы",
@@ -1585,30 +1585,32 @@ function renderRevisionReport() {
     const rows = (rev.items || []).filter((item) => itemGroup(item) === group.id);
     if (!rows.length) return "";
     itemCount += rows.length;
-    const used = prev ? usedGramsForGroup(rev, group.id, rev.date) : null;
+    const income = incomeGramsForGroup(group.id, rev.date);
+    const used = usedGramsForGroup(rev, group.id, rev.date);
     const sum = rows.reduce((n, item) => n + Number(item.grams || 0), 0);
-    const usedSum = rows.reduce((n, item) => n + (prev ? usedGramsForItem(rev, item, rev.date) : 0), 0);
+    const usedSum = rows.reduce((n, item) => n + usedGramsForItem(rev, item, rev.date), 0);
     const list = rows.map((item) => {
-      const delta = prev ? usedGramsForItem(rev, item, rev.date) : null;
+      const delta = usedGramsForItem(rev, item, rev.date);
+      const inc = incomeForItem(rev, item, rev.date);
       return `<tr>
-        <td class="name">${escapeHtml(item.name)}</td>
+        <td class="name">${escapeHtml(item.name)}${inc ? ` <small>+${formatGrams(inc)}</small>` : ""}</td>
         <td>${formatGrams(item.grams)}</td>
-        <td>${delta == null ? "—" : formatGrams(delta)}</td>
+        <td>${formatGrams(delta)}</td>
       </tr>`;
     }).join("");
     return `
       <table class="rev-shot-sheet">
         <colgroup><col class="name"><col class="num"><col class="num"></colgroup>
         <thead>
-          <tr class="rev-g group-${group.id}"><th colspan="3">${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</th></tr>
-          <tr><th class="name">Марка</th><th>г</th><th>−</th></tr>
+          <tr class="rev-g group-${group.id}"><th colspan="3">${escapeHtml(group.title)} <small>${income ? `пришло +${formatGrams(income)} г` : "прихода нет"} · ушло ${formatGrams(used)} г</small></th></tr>
+          <tr><th class="name">Марка</th><th>г</th><th>ушло</th></tr>
         </thead>
         <tbody>
           ${list}
           <tr class="rev-sum">
             <th class="name">Итого</th>
             <td>${formatGrams(sum)}</td>
-            <td>${prev ? formatGrams(usedSum) : ""}</td>
+            <td>${formatGrams(usedSum)}</td>
           </tr>
         </tbody>
       </table>
@@ -1616,10 +1618,12 @@ function renderRevisionReport() {
   }).join("");
   const prevTotal = prev ? revisionTotal(prev) : 0;
   const nowTotal = revisionTotal(rev);
-  const usedTotal = prev ? prevTotal - nowTotal : null;
+  const tobaccoIn = tobaccoIncomeTotal(rev.date);
+  const coalIn = incomeCoals(rev.date);
+  const usedTotal = prevTotal + tobaccoIn - nowTotal;
   const prevCoals = Number(prev?.coals || 0);
   const nowCoals = Number(rev.coals || 0);
-  const usedCoalsN = prev ? prevCoals - nowCoals : null;
+  const usedCoalsN = prevCoals + coalIn - nowCoals;
   paper.classList.add("rev-shot");
   paper.classList.toggle("is-dense", itemCount > 14);
   paper.innerHTML = `
@@ -1631,27 +1635,30 @@ function renderRevisionReport() {
       ? `<div class="rev-shot-cols">${cols}</div>`
       : `<p class="rev-shot-empty">Марок в этом месяце нет</p>`}
     <table class="rev-shot-sheet rev-shot-foot">
-      <colgroup><col class="name"><col class="num"><col class="num"><col class="num"></colgroup>
+      <colgroup><col class="name"><col class="num"><col class="num"><col class="num"><col class="num"></colgroup>
       <thead>
         <tr>
           <th class="name"></th>
           <th>Прошлый</th>
+          <th>Приход</th>
           <th>Снятие</th>
-          <th>−</th>
+          <th>Ушло</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <th class="name">Табак, г</th>
           <td>${formatGrams(prevTotal)}</td>
+          <td>${formatGrams(tobaccoIn)}</td>
           <td>${formatGrams(nowTotal)}</td>
-          <td>${usedTotal == null ? "—" : formatGrams(usedTotal)}</td>
+          <td>${formatGrams(usedTotal)}</td>
         </tr>
         <tr>
           <th class="name">Угли, шт</th>
           <td>${formatGrams(prevCoals)}</td>
+          <td>${formatGrams(coalIn)}</td>
           <td>${formatGrams(nowCoals)}</td>
-          <td>${usedCoalsN == null ? "—" : formatGrams(usedCoalsN)}</td>
+          <td>${formatGrams(usedCoalsN)}</td>
         </tr>
       </tbody>
     </table>
@@ -1792,7 +1799,7 @@ function prevMonthRevision(fromDate) {
 function usedGramsForGroup(rev, groupId, fromDate) {
   const prev = prevMonthRevision(fromDate);
   const before = prev ? snapshotGramsForGroup(prev, groupId) : 0;
-  return before - snapshotGramsForGroup(rev, groupId);
+  return before + incomeGramsForGroup(groupId, fromDate) - snapshotGramsForGroup(rev, groupId);
 }
 
 function usedGramsForItem(rev, item, fromDate) {
@@ -1800,12 +1807,12 @@ function usedGramsForItem(rev, item, fromDate) {
   const prevItem = (prev?.items || []).find((row) =>
     itemGroup(row) === itemGroup(item) && normalizeName(row.name) === normalizeName(item.name)
   );
-  return Number(prevItem?.grams || 0) - Number(item.grams || 0);
+  return Number(prevItem?.grams || 0) + incomeForItem(rev, item, fromDate) - Number(item.grams || 0);
 }
 
 function usedCoals(rev, fromDate) {
   const prev = prevMonthRevision(fromDate);
-  return Number(prev?.coals || 0) - Number(rev.coals || 0);
+  return Number(prev?.coals || 0) + incomeCoals(fromDate) - Number(rev.coals || 0);
 }
 
 function revisionTotal(rev) {
@@ -2027,6 +2034,13 @@ function rowGroup(row) {
   return row.group || brandGroup(row.product);
 }
 
+function stockNamesMatch(a, b) {
+  const na = normalizeName(a).replace(/\s+\d+\s*g$/i, "").trim();
+  const nb = normalizeName(b).replace(/\s+\d+\s*g$/i, "").trim();
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 function incomeGramsForGroup(groupId, fromDate) {
   return (state.tobacco || [])
     .filter((row) => (row.kind || "tobacco") === "tobacco"
@@ -2044,9 +2058,9 @@ function incomeForItem(rev, item, fromDate) {
       && inRevisionWindow(row.date, fromDate))
     .filter((row) => {
       if (isGroupTitleName(item.name)) {
-        return !brands.some((brand) => normalizeName(brand.name) === normalizeName(row.product));
+        return !brands.some((brand) => stockNamesMatch(brand.name, row.product));
       }
-      return normalizeName(row.product) === normalizeName(item.name);
+      return stockNamesMatch(item.name, row.product);
     })
     .reduce((sum, row) => sum + Number(row.qty || 0), 0);
 }
@@ -2101,6 +2115,72 @@ function incomeCoals(fromDate) {
   return (state.tobacco || [])
     .filter((row) => row.kind === "coal" && inRevisionWindow(row.date, fromDate))
     .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
+function tobaccoIncomeTotal(fromDate) {
+  return (state.tobacco || [])
+    .filter((row) => (row.kind || "tobacco") === "tobacco" && inRevisionWindow(row.date, fromDate))
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
+function renderRevisionIncome(fromDate) {
+  const box = $("#revisionIncomeBox");
+  if (!box) return;
+  const tobacco = (state.tobacco || [])
+    .filter((row) => (row.kind || "tobacco") === "tobacco" && inRevisionWindow(row.date, fromDate))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const coals = (state.tobacco || [])
+    .filter((row) => row.kind === "coal" && inRevisionWindow(row.date, fromDate))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  if (!tobacco.length && !coals.length) {
+    box.innerHTML = `<p class="rev-note">Прихода табака и угля за этот месяц нет. Когда добавишь во вкладке Приход — строки появятся здесь.</p>`;
+    return;
+  }
+  const tList = tobacco.map((row) => `
+    <div class="sheet-row">
+      <span>${parseISODate(row.date).toLocaleDateString("ru-RU")} · ${escapeHtml(groupTitle(rowGroup(row)))} · ${escapeHtml(row.product)}</span>
+      <strong>+${formatGrams(row.qty)} г</strong>
+    </div>
+  `).join("");
+  const cList = coals.map((row) => `
+    <div class="sheet-row">
+      <span>${parseISODate(row.date).toLocaleDateString("ru-RU")} · уголь · ${escapeHtml(row.product)}</span>
+      <strong>+${formatGrams(row.qty)} шт</strong>
+    </div>
+  `).join("");
+  const tSum = tobaccoIncomeTotal(fromDate);
+  const cSum = incomeCoals(fromDate);
+  box.innerHTML = `
+    <div class="sheet-caption">Приход этого месяца</div>
+    ${tList}
+    ${tSum ? `<div class="sheet-row total"><span>Табак пришло</span><strong>+${formatGrams(tSum)} г</strong></div>` : ""}
+    ${cList}
+    ${cSum ? `<div class="sheet-row total"><span>Уголь пришло</span><strong>+${formatGrams(cSum)} шт</strong></div>` : ""}
+  `;
+}
+
+function fillRevisionTotals(rev, prev) {
+  const snap = rev.date;
+  const prevTotal = prev ? revisionTotal(prev) : 0;
+  const nowTotal = revisionTotal(rev);
+  const tobaccoIn = tobaccoIncomeTotal(snap);
+  const coalIn = incomeCoals(snap);
+  const usedTotal = prevTotal + tobaccoIn - nowTotal;
+  const prevCoals = Number(prev?.coals || 0);
+  const nowCoals = Number(rev.coals || 0);
+  const coalsUsed = prevCoals + coalIn - nowCoals;
+  if ($("#revisionPrev")) $("#revisionPrev").textContent = formatGrams(prevTotal);
+  if ($("#revisionIncome")) $("#revisionIncome").textContent = formatGrams(tobaccoIn);
+  if ($("#revisionTotal")) $("#revisionTotal").textContent = formatGrams(nowTotal);
+  if ($("#revisionUsed")) $("#revisionUsed").textContent = formatGrams(usedTotal);
+  if ($("#coalsPrev")) $("#coalsPrev").textContent = `${formatGrams(prevCoals)} шт`;
+  if ($("#coalsIncome")) $("#coalsIncome").textContent = `${formatGrams(coalIn)} шт`;
+  if ($("#coalsNow")) $("#coalsNow").textContent = `${formatGrams(nowCoals)} шт`;
+  const coalsRemain = $("#coalsRemain");
+  if (coalsRemain) {
+    coalsRemain.textContent = `${formatGrams(coalsUsed)} шт`;
+    coalsRemain.classList.toggle("low-stock", coalsUsed > 0);
+  }
 }
 
 function remainCoals(rev, fromDate) {
@@ -2328,23 +2408,8 @@ function renderRevision() {
   }
   const snap = rev.date;
   const prev = prevMonthRevision(snap);
-  const prevTotal = prev ? revisionTotal(prev) : 0;
-  const usedTotal = prev ? prevTotal - revisionTotal(rev) : null;
-  const coalsUsed = prev ? usedCoals(rev, snap) : null;
-  $("#revisionPrev").textContent = formatGrams(prevTotal);
-  $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  $("#revisionUsed").textContent = usedTotal == null ? "—" : formatGrams(usedTotal);
-  const prevCoals = Number(prev?.coals || 0);
-  const nowCoals = Number(rev.coals || 0);
-  const coalsPrevEl = $("#coalsPrev");
-  if (coalsPrevEl) coalsPrevEl.textContent = `${formatGrams(prevCoals)} шт`;
-  const coalsNowEl = $("#coalsNow");
-  if (coalsNowEl) coalsNowEl.textContent = `${formatGrams(nowCoals)} шт`;
-  const coalsRemain = $("#coalsRemain");
-  if (coalsRemain) {
-    coalsRemain.textContent = coalsUsed == null ? "—" : `${formatGrams(coalsUsed)} шт`;
-    coalsRemain.classList.toggle("low-stock", Number(coalsUsed) > 0);
-  }
+  fillRevisionTotals(rev, prev);
+  renderRevisionIncome(snap);
   const groups = REVISION_GROUPS.filter((group) => db.current !== "shishka" || group.id !== "tangiers");
   if (!rev.items.length) {
     $("#revisionRows").innerHTML = `<p class="rev-empty">Список пустой. Добавь марку сам: тип + название + граммы остатка.</p>`;
@@ -2357,17 +2422,21 @@ function renderRevision() {
         .map((item, index) => ({ item, index }))
         .filter(({ item }) => itemGroup(item) === group.id);
       if (!rows.length) return "";
-      const used = prev ? usedGramsForGroup(rev, group.id, snap) : null;
-      const list = rows.map(({ item, index }) => `
+      const income = incomeGramsForGroup(group.id, snap);
+      const used = usedGramsForGroup(rev, group.id, snap);
+      const list = rows.map(({ item, index }) => {
+        const inc = incomeForItem(rev, item, snap);
+        return `
           <div class="sheet-row rev-item group-${group.id}">
-            <span>${escapeHtml(item.name)}</span>
+            <span>${escapeHtml(item.name)}${inc ? `<small class="rev-in">пришло +${formatGrams(inc)} г</small>` : ""}</span>
             <input type="number" min="0" step="1" inputmode="numeric" value="${item.grams || 0}" data-grams="${index}">
             <button type="button" class="danger compact" data-del-brand="${index}" aria-label="Удалить">×</button>
           </div>
-        `).join("");
+        `;
+      }).join("");
       return `
         <section class="rev-block group-${group.id}">
-          <h3>${escapeHtml(group.title)}${used == null ? "" : ` <small>− ${formatGrams(used)} г</small>`}</h3>
+          <h3>${escapeHtml(group.title)} <small>${income ? `пришло +${formatGrams(income)} г` : "прихода нет"} · ушло ${formatGrams(used)} г</small></h3>
           ${list}
         </section>
       `;
@@ -2952,11 +3021,7 @@ $("#revisionRows").addEventListener("input", (e) => {
   if (!rev?.items[Number(index)]) return;
   rev.items[Number(index)].grams = Number(e.target.value || 0);
   save();
-  const prev = prevMonthRevision(rev.date);
-  const prevTotal = prev ? revisionTotal(prev) : 0;
-  if ($("#revisionPrev")) $("#revisionPrev").textContent = formatGrams(prevTotal);
-  if ($("#revisionTotal")) $("#revisionTotal").textContent = formatGrams(revisionTotal(rev));
-  if ($("#revisionUsed")) $("#revisionUsed").textContent = prev ? formatGrams(prevTotal - revisionTotal(rev)) : "—";
+  fillRevisionTotals(rev, prevMonthRevision(rev.date));
 });
 
 $("#revisionRows").addEventListener("click", (e) => {
@@ -2974,17 +3039,7 @@ $("#coalsInput").addEventListener("input", (e) => {
   if (!rev) return;
   rev.coals = Number(e.target.value || 0);
   save();
-  const remainEl = $("#coalsRemain");
-  if (remainEl) {
-    const prev = prevMonthRevision(rev.date);
-    const now = usedCoals(rev, rev.date);
-    remainEl.textContent = prev ? `${formatGrams(now)} шт` : "—";
-    remainEl.classList.toggle("low-stock", Boolean(prev) && now > 0);
-    const coalsPrevEl = $("#coalsPrev");
-    if (coalsPrevEl) coalsPrevEl.textContent = `${formatGrams(Number(prev?.coals || 0))} шт`;
-    const coalsNowEl = $("#coalsNow");
-    if (coalsNowEl) coalsNowEl.textContent = `${formatGrams(Number(rev.coals || 0))} шт`;
-  }
+  fillRevisionTotals(rev, prevMonthRevision(rev.date));
   const coalsWarn = $("#coalsWarn");
   if (coalsWarn) coalsWarn.hidden = Number(rev.coals || 0) > 0 || remainCoals(rev, rev.date) > 0;
 });

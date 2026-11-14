@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "96";
+      var BUILD = "97";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -135,7 +135,7 @@
         <button type="button" class="icon-btn" id="prevRevMonth" aria-label="Предыдущий месяц">‹</button>
         <div class="period-label">
           <strong id="revMonthLabel">—</strong>
-          <span>Каждый месяц свой снимок. Не смешивается с другими</span>
+          <span>Снятие остатка. Приход табака и угля за этот месяц виден ниже</span>
         </div>
         <button type="button" class="icon-btn" id="nextRevMonth" aria-label="Следующий месяц">›</button>
       </div>
@@ -157,6 +157,7 @@
           <input type="text" name="name" placeholder="Марка табака" required>
           <button type="submit" class="primary compact">+</button>
         </form>
+        <div id="revisionIncomeBox" class="rev-income"></div>
         <div id="revisionRows"></div>
         <div class="sheet-caption">2. Остаток углей</div>
         <label class="sheet-row coals" id="coalsInputRow">
@@ -169,11 +170,15 @@
           <strong id="revisionPrev">0</strong>
         </div>
         <div class="sheet-row total">
+          <span>Табак, приход</span>
+          <strong id="revisionIncome">0</strong>
+        </div>
+        <div class="sheet-row total">
           <span>Табак, снятие</span>
           <strong id="revisionTotal">0</strong>
         </div>
         <div class="sheet-row total">
-          <span>−</span>
+          <span>Ушло</span>
           <strong id="revisionUsed">—</strong>
         </div>
         <div class="sheet-row total">
@@ -181,11 +186,15 @@
           <strong id="coalsPrev">0 шт</strong>
         </div>
         <div class="sheet-row total">
+          <span>Угли, приход</span>
+          <strong id="coalsIncome">0</strong>
+        </div>
+        <div class="sheet-row total">
           <span>Угли, снятие</span>
           <strong id="coalsNow">0 шт</strong>
         </div>
         <div class="sheet-row total">
-          <span>−</span>
+          <span>Ушло</span>
           <strong id="coalsRemain">—</strong>
         </div>
       </div>
@@ -195,7 +204,7 @@
       <div class="period-bar">
         <p class="period-label">
           <strong id="incomeTitle">Приход табака</strong>
-          <span id="incomeHint">Только чеки. К ревизии не привязано</span>
+          <span id="incomeHint">Чеки. Табак и уголь этого месяца сразу видны в ревизии</span>
         </p>
       </div>
 
