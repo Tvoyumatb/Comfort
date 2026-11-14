@@ -1,4 +1,4 @@
-const APP_VERSION = "92";
+const APP_VERSION = "93";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1040,12 +1040,19 @@ function packsInLoungeMonth(name, perPack) {
 
 function monthBrokenQty(name) {
   return (state.fines || [])
-    .filter((f) => inLoungeMonth(f.date) && String(f.what || "").toLowerCase() === String(name || "").toLowerCase())
+    .filter((f) => f.kind !== "fine"
+      && inLoungeMonth(f.date)
+      && String(f.what || "").toLowerCase() === String(name || "").toLowerCase())
     .reduce((sum, f) => sum + Number(f.qty || 0), 0);
 }
 
 function monthNeedQty(item) {
-  return Math.max(0, monthBrokenQty(item.name) - qtyInLoungeMonth(item.name, "inventory"));
+  const broken = (state.fines || [])
+    .filter((f) => f.kind !== "fine"
+      && inLoungeMonth(f.date)
+      && String(f.what || "").toLowerCase() === String(item.name || "").toLowerCase())
+    .reduce((sum, f) => sum + Number(f.qty || 0), 0);
+  return Math.max(0, broken - qtyInLoungeMonth(item.name, "inventory"));
 }
 
 function ensureInventory() {
@@ -1153,7 +1160,6 @@ function payout(empId) {
     c.eveningWeekend * state.rates.eveningWeekend +
     c.intern * state.rates.intern -
     Number(extra.fines || 0) -
-    Number(extra.advances || 0) -
     damageTotal(empId)
   );
 }
@@ -1242,9 +1248,7 @@ function renderPay() {
         <td>${c.eveningWeekday}</td>
         <td>${c.eveningWeekend}</td>
         <td>${c.intern}</td>
-        <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.fines || 0}" data-emp-extra="${emp.id}" data-field="fines"></td>
-        <td><input type="number" min="0" step="1000" inputmode="numeric" value="${extra.advances || 0}" data-emp-extra="${emp.id}" data-field="advances"></td>
-        <td>${formatSum(damageTotal(emp.id))}</td>
+        <td>${formatSum(Number(extra.fines || 0) + damageTotal(emp.id))}</td>
         <td class="sum">${formatSum(payout(emp.id))}</td>
       </tr>
     `;
@@ -1259,9 +1263,7 @@ function renderPay() {
           <th>Вечер будние</th>
           <th>Вечер выходные</th>
           <th>Стажировка</th>
-          <th>Штрафы</th>
-          <th>Авансы</th>
-          <th>Порча</th>
+          <th>Порча / штраф</th>
           <th>К выплате</th>
         </tr>
       </thead>
@@ -1295,8 +1297,8 @@ function renderFines() {
     return `
       <div class="hall-event">
         <div>
-          <strong>${escapeHtml(f.what)}</strong>
-          <span>${escapeHtml(emp?.name || "Сотрудник")} · ${parseISODate(f.date).toLocaleDateString("ru-RU")} · ${f.qty} шт · ${formatSum(f.sum)}</span>
+          <strong>${f.kind === "fine" ? "Штраф" : escapeHtml(f.what)}</strong>
+          <span>${escapeHtml(emp?.name || "Сотрудник")} · ${parseISODate(f.date).toLocaleDateString("ru-RU")}${f.kind === "fine" ? "" : ` · ${f.qty} шт`} · ${formatSum(f.sum)}</span>
         </div>
         <button type="button" class="text-del" data-del-fine="${f.id}" aria-label="Удалить">×</button>
       </div>
@@ -1346,9 +1348,7 @@ function renderReport() {
         <td>${c.eveningWeekday}</td>
         <td>${c.eveningWeekend}</td>
         <td>${c.intern}</td>
-        <td>${formatSum(extra.fines || 0)}</td>
-        <td>${formatSum(extra.advances || 0)}</td>
-        <td>${formatSum(damageTotal(emp.id))}</td>
+        <td>${formatSum(Number(extra.fines || 0) + damageTotal(emp.id))}</td>
       </tr>
     `;
   }).join("");
@@ -1432,9 +1432,7 @@ function renderReport() {
             <th>Будни вечер</th>
             <th>Выходной вечер</th>
             <th>Стаж</th>
-            <th>Штрафы</th>
-            <th>Авансы</th>
-            <th>Порча</th>
+            <th>Порча / штраф</th>
           </tr>
         </thead>
         <tbody>
@@ -1442,15 +1440,13 @@ function renderReport() {
           <tr>
             <th class="name">Итого</th>
             <td></td><td></td><td></td><td></td>
-            <td class="sum">${formatSum(lateTotal)}</td>
-            <td class="sum">${formatSum(advanceTotal)}</td>
-            <td class="sum">${formatSum(damageSum)}</td>
+            <td class="sum">${formatSum(lateTotal + damageSum)}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div class="report-split">${lateTable}${damageTable}</div>
+    <div class="report-split">${damageTable}${lateTable}</div>
   `;
   requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
@@ -2345,10 +2341,12 @@ function syncIncomeForm() {
   const productInput = document.querySelector('#tobaccoForm [name="product"]');
   const isInventory = incomingKind === "inventory";
   const isCoal = incomingKind === "coal";
-  if (stockWrap) stockWrap.hidden = true;
-  if (freeWrap) freeWrap.hidden = false;
+  const bulkWrap = $("#bulkTobaccoWrap");
+  if (bulkWrap) bulkWrap.hidden = !(!isInventory && !isCoal);
+  if (stockWrap) stockWrap.hidden = !isInventory;
+  if (freeWrap) freeWrap.hidden = isInventory;
   const groupWrap = $("#tobaccoGroupWrap");
-  if (groupWrap) groupWrap.hidden = incomingKind !== "tobacco";
+  if (groupWrap) groupWrap.hidden = true;
   const submit = $("#tobaccoSubmit");
   if (submit) submit.hidden = isCoal;
   const tobaccoForm = $("#tobaccoForm");
@@ -2359,11 +2357,17 @@ function syncIncomeForm() {
     $("#qtyLabelText").textContent = "Пачек";
   }
   if (productInput) {
-    productInput.required = isInventory;
+    productInput.required = false;
   }
+  const qtyInput = document.querySelector('#tobaccoForm [name="qty"]');
+  const qtyField = $("#qtyFieldWrap");
+  if (qtyInput) qtyInput.required = isInventory;
+  if (qtyField) qtyField.hidden = !isInventory;
+  const tangiersBulk = document.querySelector('#tobaccoForm [name="tangiersGrams"]')?.closest("label");
+  if (tangiersBulk) tangiersBulk.hidden = db.current === "shishka";
   if (stockSelect) {
-    stockSelect.disabled = true;
-    stockSelect.required = false;
+    stockSelect.disabled = !isInventory;
+    stockSelect.required = isInventory;
     const stock = ensureInventory();
     const current = stockSelect.value;
     const bowls = stock.filter((item) => stockKind(item) === "bowl");
@@ -2707,15 +2711,18 @@ $("#payWrap").addEventListener("input", (e) => {
 $("#fineForm").addEventListener("submit", (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target));
-  const what = data.what.trim();
+  const kind = data.kind === "fine" ? "fine" : "damage";
+  const what = (data.what || "").trim() || (kind === "fine" ? "Штраф" : "");
+  if (!what) return;
   const date = clampDateToMonth(data.date, toISODate(viewLoungeMonth));
   if (!Array.isArray(state.fines)) state.fines = [];
   state.fines.push({
     id: uid(),
     empId: data.empId,
     date,
+    kind,
     what,
-    qty: Number(data.qty || 1),
+    qty: Number(data.qty || (kind === "fine" ? 0 : 1)),
     sum: Number(data.sum || 0),
   });
   extrasFor(data.empId).damage = 0;
@@ -3159,15 +3166,11 @@ function parseInvoiceLines(text) {
     });
   });
   invoiceDraftMeta = { date, check, supplier: supplier || "Rotana" };
-  invoiceDrafts = rows.length ? rows : [{
-    keep: true,
-    kind: "tobacco",
-    group: "classic",
-    product: "",
-    qty: 0,
-    packs: 1,
-    sum: 0,
-  }];
+  invoiceDrafts = rows.length ? rows : [
+    { keep: true, kind: "tobacco", group: "classic", product: "Классик", qty: 0, packs: 0, sum: 0 },
+    { keep: true, kind: "tobacco", group: "premium", product: "Премиум", qty: 0, packs: 0, sum: 0 },
+    { keep: true, kind: "tobacco", group: "tangiers", product: "Tangiers", qty: 0, packs: 0, sum: 0 },
+  ];
 }
 
 function renderInvoiceDraft() {
@@ -3413,15 +3416,37 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   const data = Object.fromEntries(new FormData(e.target));
   const kind = data.kind || incomingKind;
   if (kind === "tobacco") {
-    addTobaccoIncome({
-      date: data.date,
-      group: data.group,
-      product: (data.product || "").trim(),
-      qty: data.qty,
-      sum: data.sum,
-      supplier: (data.supplier || "").trim(),
-      note: (data.note || "").trim(),
-    });
+    const bulk = [
+      ["classic", data.classicGrams],
+      ["premium", data.premiumGrams],
+      ["fruit", data.fruitGrams],
+      ["tangiers", data.tangiersGrams],
+    ].filter(([, grams]) => Number(grams) > 0);
+    if (bulk.length) {
+      bulk.forEach(([group, grams]) => {
+        addTobaccoIncome({
+          date: data.date,
+          group,
+          product: groupTitle(group),
+          qty: grams,
+          sum: bulk.length === 1 ? data.sum : 0,
+          supplier: (data.supplier || "").trim(),
+          note: (data.note || "").trim(),
+        });
+      });
+    } else if (Number(data.qty) > 0) {
+      addTobaccoIncome({
+        date: data.date,
+        group: data.group,
+        product: (data.product || "").trim(),
+        qty: data.qty,
+        sum: data.sum,
+        supplier: (data.supplier || "").trim(),
+        note: (data.note || "").trim(),
+      });
+    } else {
+      return;
+    }
     save();
     e.target.reset();
     incomingKind = "tobacco";

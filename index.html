@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "92";
+      var BUILD = "93";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -204,9 +204,10 @@
       <div class="card form scan-card no-print">
         <h2>Фото накладной</h2>
         <p class="hint">Сфоткай чек на сайте. Я разберу позиции, ты проверишь и только потом можно записать.</p>
+        <p class="hint">Или кинь общий вес классик / премиум / Tangiers в форме ниже — не надо по одной марке.</p>
         <label class="scan-pick">
           Сфоткать или выбрать фото
-          <input type="file" id="invoicePhoto" accept="image/*" capture="environment" hidden>
+          <input type="file" id="invoicePhoto" accept="image/*" hidden>
         </label>
         <p class="scan-status" id="scanStatus" hidden></p>
         <img id="scanPreview" class="scan-preview" alt="" hidden>
@@ -222,7 +223,7 @@
             <option value="coal">Уголь</option>
           </select>
         </label>
-        <label id="tobaccoGroupWrap">Тип табака
+        <label id="tobaccoGroupWrap" hidden>Тип табака
           <select name="group" id="incomeGroupSelect">
             <option value="classic">Классик</option>
             <option value="premium">Премиум</option>
@@ -235,10 +236,27 @@
             <input type="date" name="date" required>
           </span>
         </label>
-        <label id="stockProductWrap" hidden>Позиция из остатков
+        <div id="bulkTobaccoWrap" class="bulk-tobacco">
+          <p class="hint">Общий вес закупки, граммы</p>
+          <div class="row bulk-grams">
+            <label>Классик
+              <input type="number" name="classicGrams" min="0" step="1" placeholder="0">
+            </label>
+            <label>Премиум
+              <input type="number" name="premiumGrams" min="0" step="1" placeholder="0">
+            </label>
+            <label>Фрукт
+              <input type="number" name="fruitGrams" min="0" step="1" placeholder="0">
+            </label>
+            <label>Tangiers
+              <input type="number" name="tangiersGrams" min="0" step="1" placeholder="0">
+            </label>
+          </div>
+        </div>
+        <label id="stockProductWrap" hidden>Что в зале, куда плюсовать
           <select name="stockProduct" id="stockProductSelect"></select>
         </label>
-        <label id="freeProductWrap"><span id="productLabelText">Марка</span>
+        <label id="freeProductWrap" hidden><span id="productLabelText">Марка</span>
           <input type="text" name="product" list="productsList" placeholder="Например Starline">
         </label>
         <datalist id="productsList"></datalist>
@@ -247,8 +265,8 @@
         </label>
         <datalist id="suppliersList"></datalist>
         <div class="row">
-          <label><span id="qtyLabelText">Граммы</span>
-            <input type="number" name="qty" min="1" step="1" required>
+          <label id="qtyFieldWrap"><span id="qtyLabelText">Граммы</span>
+            <input type="number" name="qty" min="0" step="1" placeholder="0">
           </label>
           <label>Сумма
             <input type="number" name="sum" min="0" step="0.01" placeholder="0">
@@ -302,14 +320,22 @@
         <button type="button" class="icon-btn" id="nextLoungeMonth" aria-label="Следующий месяц">›</button>
       </div>
       <div id="loungeAlerts"></div>
-      <h2 class="block-title">Сломали</h2>
+      <h2 class="block-title">Порча и штрафы</h2>
       <form class="card form hall-fine" id="fineForm">
         <div class="row">
           <label>Кто
             <select name="empId" id="fineEmpSelect" required></select>
           </label>
+          <label>Вид
+            <select name="kind" id="fineKindSelect">
+              <option value="damage">Порча</option>
+              <option value="fine">Штраф</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
           <label>Что
-            <input type="text" name="what" list="fineWhatList" placeholder="Чаша, колба" required>
+            <input type="text" name="what" list="fineWhatList" placeholder="Чаша, колба или за что штраф">
           </label>
         </div>
         <datalist id="fineWhatList"></datalist>
@@ -320,7 +346,7 @@
             </span>
           </label>
           <label>Шт
-            <input type="number" name="qty" min="1" step="1" value="1" required>
+            <input type="number" name="qty" min="0" step="1" value="1">
           </label>
           <label>Сумма
             <input type="number" name="sum" min="0" step="1000" required>

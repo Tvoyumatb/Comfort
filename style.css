@@ -33,10 +33,14 @@ body[data-venue="shishka"] {
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   min-height: 100%;
-  background: #070707;
+  background: transparent;
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
   touch-action: manipulation;
@@ -54,7 +58,7 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  background-color: #070707;
+  background-color: transparent;
 }
 
 body::before {
@@ -63,15 +67,15 @@ body::before {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(180deg, rgba(8, 6, 5, 0.62) 0%, rgba(8, 6, 5, 0.78) 100%),
-    url("wallpaper-tangiers.jpg") center / cover no-repeat;
+    linear-gradient(180deg, rgba(8, 6, 5, 0.42) 0%, rgba(8, 6, 5, 0.62) 100%),
+    url("wallpaper-tangiers-2.jpg") center / cover no-repeat;
   pointer-events: none;
 }
 
 body[data-venue="shishka"]::before {
   background:
-    linear-gradient(180deg, rgba(10, 12, 18, 0.66) 0%, rgba(10, 12, 18, 0.82) 100%),
-    url("wallpaper-tangiers.jpg") center / cover no-repeat;
+    linear-gradient(180deg, rgba(10, 12, 18, 0.48) 0%, rgba(10, 12, 18, 0.68) 100%),
+    url("wallpaper-tangiers-2.jpg") center / cover no-repeat;
 }
 
 .topbar {
@@ -443,6 +447,18 @@ main {
   padding: 16px;
   margin-bottom: 16px;
   overflow: hidden;
+}
+
+.bulk-tobacco {
+  margin: 0 0 12px;
+}
+
+.bulk-grams {
+  grid-template-columns: 1fr 1fr;
+}
+
+.bulk-grams input {
+  margin-top: 4px;
 }
 
 .extra-sales {
