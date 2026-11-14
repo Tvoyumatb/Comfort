@@ -1902,9 +1902,14 @@ body.report-open::before {
 }
 
 @media (min-width: 760px) {
+  :root {
+    --pad: 28px;
+  }
+
   body {
-    max-width: 1100px;
-    margin: 0 auto;
+    max-width: none;
+    width: 100%;
+    margin: 0;
   }
 
   h1 {
@@ -1912,6 +1917,20 @@ body.report-open::before {
   }
 
   .stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .hall-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --pad: 36px;
+  }
+
+  .hall-grid {
     grid-template-columns: repeat(4, 1fr);
   }
 }
