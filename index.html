@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "99";
+      var BUILD = "100";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -248,7 +248,8 @@
         <div id="packTobaccoWrap" class="pack-tobacco">
           <p class="hint">Кинь сколько коробок. Граммы сам посчитает по фасовке марки.</p>
           <label>Марка
-            <select name="packBrand" id="packBrandSelect"></select>
+            <input type="text" name="packBrand" id="packBrandSelect" list="packBrandList" placeholder="Начни писать марку" autocomplete="off">
+            <datalist id="packBrandList"></datalist>
           </label>
           <div id="packBoxes" class="pack-boxes"></div>
           <p class="hint" id="packPreview">—</p>

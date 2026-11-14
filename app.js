@@ -1,4 +1,4 @@
-const APP_VERSION = "99";
+const APP_VERSION = "100";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -2474,31 +2474,66 @@ function tobaccoPackSizes(name) {
   return tobaccoPackEntry(name)?.packs?.slice() || [100, 125, 200, 250];
 }
 
+function cleanBrandName(name) {
+  return String(name || "").replace(/\s+\d+\s*g$/i, "").trim();
+}
+
+function revisionBrandNames() {
+  const names = [];
+  (state.revisions || []).forEach((rev) => {
+    (rev.items || []).forEach((item) => {
+      const name = cleanBrandName(item.name);
+      if (name && !isGroupTitleName(name)) names.push(name);
+    });
+  });
+  return names;
+}
+
+function allTobaccoBrandNames() {
+  const seen = new Map();
+  const add = (name) => {
+    const clean = cleanBrandName(name);
+    const key = normalizeName(clean);
+    if (!key || isGroupTitleName(clean)) return;
+    if (!seen.has(key)) seen.set(key, clean);
+  };
+  TOBACCO_PACKS.forEach((row) => add(row.name));
+  DEFAULT_BRANDS.forEach(add);
+  revisionBrandNames().forEach(add);
+  (state.tobacco || [])
+    .filter((row) => (row.kind || "tobacco") === "tobacco")
+    .forEach((row) => add(row.product));
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "ru"));
+}
+
 function fillPackBrandSelect() {
-  const select = $("#packBrandSelect");
-  if (!select) return;
-  const current = select.value;
-  const names = [...new Set([
-    ...TOBACCO_PACKS.map((row) => row.name),
-    ...unique((state.tobacco || []).filter((row) => (row.kind || "tobacco") === "tobacco"), "product")
-      .map((name) => String(name).replace(/\s+\d+\s*g$/i, "").trim())
-      .filter(Boolean),
-  ])];
-  select.innerHTML = `<option value="">Выбери марку</option>${names.map((name) =>
-    `<option value="${escapeHtml(name)}">${escapeHtml(name)}${tobaccoPackEntry(name) ? ` · ${tobaccoPackSizes(name).join("/")} г` : ""}</option>`
-  ).join("")}`;
-  if (current && [...select.options].some((opt) => opt.value === current)) select.value = current;
+  const input = $("#packBrandSelect");
+  const list = $("#packBrandList");
+  if (!input && !list) return;
+  const names = allTobaccoBrandNames();
+  if (list) {
+    list.innerHTML = names.map((name) => {
+      const packs = tobaccoPackEntry(name) ? ` · ${tobaccoPackSizes(name).join("/")} г` : "";
+      return `<option value="${escapeHtml(name)}">${escapeHtml(name)}${packs}</option>`;
+    }).join("");
+  }
 }
 
 function fillPackBoxFields() {
-  const brand = $("#packBrandSelect")?.value || "";
+  const brand = ($("#packBrandSelect")?.value || "").trim();
   const box = $("#packBoxes");
   if (!box) return;
   if (!brand) {
+    box.dataset.brand = "";
     box.innerHTML = "";
     updatePackPreview();
     return;
   }
+  if (box.dataset.brand === normalizeName(brand) && box.innerHTML) {
+    updatePackPreview();
+    return;
+  }
+  box.dataset.brand = normalizeName(brand);
   const sizes = tobaccoPackSizes(brand);
   box.innerHTML = `
     <div class="row pack-box-grid">
@@ -2711,7 +2746,7 @@ function renderTobacco() {
   }
 
   const names = unique(incomingRows(), "product");
-  const extras = incomingKind === "tobacco" ? DEFAULT_BRANDS : incomingKind === "inventory"
+  const extras = incomingKind === "tobacco" ? allTobaccoBrandNames() : incomingKind === "inventory"
     ? ensureInventory().map((item) => item.name)
     : ensureCoalStock().map((item) => item.name);
   fillDatalist("#productsList", [...new Set([...extras, ...names])]);
@@ -3294,6 +3329,7 @@ $("#incomeKindSelect").addEventListener("change", (e) => {
 });
 
 $("#packBrandSelect")?.addEventListener("change", () => fillPackBoxFields());
+$("#packBrandSelect")?.addEventListener("input", () => fillPackBoxFields());
 $("#packBoxes")?.addEventListener("input", updatePackPreview);
 
 $("#stockProductSelect")?.addEventListener("change", () => {
