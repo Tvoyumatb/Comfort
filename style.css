@@ -449,8 +449,13 @@ main {
   overflow: hidden;
 }
 
+.pack-tobacco,
 .bulk-tobacco {
   margin: 0 0 12px;
+}
+
+.pack-tobacco .hint {
+  margin: 0 0 8px;
 }
 
 .bulk-grams {

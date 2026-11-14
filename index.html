@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "94";
+      var BUILD = "95";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -236,8 +236,26 @@
             <input type="date" name="date" required>
           </span>
         </label>
+        <div id="packTobaccoWrap" class="pack-tobacco">
+          <p class="hint">Марка и фасовка — граммы посчитаются сами</p>
+          <label>Марка
+            <select name="packBrand" id="packBrandSelect"></select>
+          </label>
+          <div class="row">
+            <label>Фасовка
+              <select name="packSize" id="packSizeSelect"></select>
+            </label>
+            <label id="packCustomWrap" hidden>Своя, г
+              <input type="number" name="packCustom" id="packCustomInput" min="1" step="1" placeholder="г">
+            </label>
+            <label>Пачек
+              <input type="number" name="packCount" id="packCountInput" min="1" step="1" value="1">
+            </label>
+          </div>
+          <p class="hint" id="packPreview">—</p>
+        </div>
         <div id="bulkTobaccoWrap" class="bulk-tobacco">
-          <p class="hint">Общий вес закупки, граммы</p>
+          <p class="hint">Или сразу общий вес по типам, без марок</p>
           <div class="row bulk-grams">
             <label>Классик
               <input type="number" name="classicGrams" min="0" step="1" placeholder="0">
