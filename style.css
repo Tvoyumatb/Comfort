@@ -458,6 +458,16 @@ main {
   margin: 0 0 8px;
 }
 
+.pack-boxes {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.pack-box-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
 .bulk-grams {
   grid-template-columns: 1fr 1fr;
 }

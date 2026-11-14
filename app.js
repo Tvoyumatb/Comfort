@@ -1,4 +1,4 @@
-const APP_VERSION = "95";
+const APP_VERSION = "96";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -2407,40 +2407,61 @@ function fillPackBrandSelect() {
   if (current && [...select.options].some((opt) => opt.value === current)) select.value = current;
 }
 
-function fillPackSizeSelect() {
+function fillPackBoxFields() {
   const brand = $("#packBrandSelect")?.value || "";
-  const select = $("#packSizeSelect");
-  const customWrap = $("#packCustomWrap");
-  if (!select) return;
-  const sizes = brand ? tobaccoPackSizes(brand) : [];
-  const current = select.value;
-  select.innerHTML = sizes.map((size) =>
-    `<option value="${size}">${size} г</option>`
-  ).join("") + `<option value="other">своя</option>`;
-  if (sizes.length === 1) select.value = String(sizes[0]);
-  else if (current && [...select.options].some((opt) => opt.value === current)) select.value = current;
-  if (customWrap) customWrap.hidden = select.value !== "other";
+  const box = $("#packBoxes");
+  if (!box) return;
+  if (!brand) {
+    box.innerHTML = "";
+    updatePackPreview();
+    return;
+  }
+  const sizes = tobaccoPackSizes(brand);
+  box.innerHTML = `
+    <div class="row pack-box-grid">
+      ${sizes.map((size) => `
+        <label>Коробок ${size} г
+          <input type="number" min="0" step="1" value="0" inputmode="numeric" data-pack-boxes="${size}">
+        </label>
+      `).join("")}
+    </div>
+    <div class="row">
+      <label>Ещё коробок
+        <input type="number" min="0" step="1" value="0" inputmode="numeric" data-pack-custom-count>
+      </label>
+      <label>Грамм в той коробке
+        <input type="number" min="1" step="1" placeholder="г" inputmode="numeric" data-pack-custom-size>
+      </label>
+    </div>
+  `;
   updatePackPreview();
 }
 
-function currentPackSize() {
-  const select = $("#packSizeSelect");
-  if (!select) return 0;
-  if (select.value === "other") return Number($("#packCustomInput")?.value || 0);
-  return Number(select.value || 0);
+function collectPackBoxes() {
+  const brand = ($("#packBrandSelect")?.value || "").trim();
+  const rows = [];
+  $$("[data-pack-boxes]").forEach((input) => {
+    const count = Number(input.value || 0);
+    const size = Number(input.dataset.packBoxes);
+    if (brand && count > 0 && size > 0) rows.push({ brand, size, count });
+  });
+  const customCount = Number(document.querySelector("[data-pack-custom-count]")?.value || 0);
+  const customSize = Number(document.querySelector("[data-pack-custom-size]")?.value || 0);
+  if (brand && customCount > 0 && customSize > 0) rows.push({ brand, size: customSize, count: customCount });
+  return rows;
 }
 
 function updatePackPreview() {
   const el = $("#packPreview");
   if (!el) return;
-  const brand = $("#packBrandSelect")?.value || "";
-  const size = currentPackSize();
-  const packs = Number($("#packCountInput")?.value || 0);
-  if (!brand || !size || packs < 1) {
-    el.textContent = "Выбери марку, фасовку и сколько пачек";
+  const rows = collectPackBoxes();
+  if (!rows.length) {
+    el.textContent = "Поставь число коробок — граммы появятся тут";
     return;
   }
-  el.textContent = `${brand} · ${packs} × ${size} г = ${formatGrams(packs * size)} г`;
+  const total = rows.reduce((sum, row) => sum + row.size * row.count, 0);
+  const parts = rows.map((row) => `${row.count} × ${row.size} г`);
+  el.textContent = `${rows[0].brand}: ${parts.join(" + ")} = ${formatGrams(total)} г`;
 }
 
 function syncIncomeForm() {
@@ -2468,7 +2489,7 @@ function syncIncomeForm() {
   if (bulkWrap) bulkWrap.hidden = !isTobacco;
   if (isTobacco) {
     fillPackBrandSelect();
-    fillPackSizeSelect();
+    fillPackBoxFields();
   }
   if (stockWrap) stockWrap.hidden = !isInventory;
   if (freeWrap) freeWrap.hidden = isInventory;
@@ -3202,14 +3223,8 @@ $("#incomeKindSelect").addEventListener("change", (e) => {
   setIncomingKind(e.target.value);
 });
 
-$("#packBrandSelect")?.addEventListener("change", () => fillPackSizeSelect());
-$("#packSizeSelect")?.addEventListener("change", () => {
-  const customWrap = $("#packCustomWrap");
-  if (customWrap) customWrap.hidden = $("#packSizeSelect").value !== "other";
-  updatePackPreview();
-});
-$("#packCustomInput")?.addEventListener("input", updatePackPreview);
-$("#packCountInput")?.addEventListener("input", updatePackPreview);
+$("#packBrandSelect")?.addEventListener("change", () => fillPackBoxFields());
+$("#packBoxes")?.addEventListener("input", updatePackPreview);
 
 $("#stockProductSelect")?.addEventListener("change", () => {
   if (incomingKind !== "inventory") return;
@@ -3568,9 +3583,7 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
   const data = Object.fromEntries(new FormData(e.target));
   const kind = data.kind || incomingKind;
   if (kind === "tobacco") {
-    const packSize = data.packSize === "other" ? Number(data.packCustom || 0) : Number(data.packSize || 0);
-    const packCount = Number(data.packCount || 0);
-    const packBrand = (data.packBrand || "").trim();
+    const packRows = collectPackBoxes();
     const bulk = [
       ["classic", data.classicGrams],
       ["premium", data.premiumGrams],
@@ -3578,15 +3591,17 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
       ["tangiers", data.tangiersGrams],
     ].filter(([, grams]) => Number(grams) > 0);
     let wrote = false;
-    if (packBrand && packSize > 0 && packCount > 0) {
-      addTobaccoIncome({
-        date: data.date,
-        group: brandGroup(packBrand),
-        product: `${packBrand} ${packSize}g`,
-        qty: packSize * packCount,
-        sum: data.sum,
-        supplier: (data.supplier || "").trim(),
-        note: (data.note || "").trim() || `${packCount} пач. × ${packSize} г`,
+    if (packRows.length) {
+      packRows.forEach((row, index) => {
+        addTobaccoIncome({
+          date: data.date,
+          group: brandGroup(row.brand),
+          product: `${row.brand} ${row.size}g`,
+          qty: row.size * row.count,
+          sum: index === 0 ? data.sum : 0,
+          supplier: (data.supplier || "").trim(),
+          note: (data.note || "").trim() || `${row.count} кор. × ${row.size} г`,
+        });
       });
       wrote = true;
     }
