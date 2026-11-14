@@ -1720,6 +1720,41 @@ body.report-open::before {
   background: rgba(196, 92, 74, 0.16);
 }
 
+.hall-name {
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.hall-now,
+.hall-kind {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hall-now input {
+  width: 88px;
+  min-width: 72px;
+  margin: 0;
+}
+
+.hall-kind {
+  margin-top: 8px;
+}
+
+.hall-kind select {
+  width: auto;
+  min-width: 120px;
+  margin: 0;
+  padding: 8px 10px;
+}
+
 .hall-card-top {
   display: flex;
   align-items: baseline;

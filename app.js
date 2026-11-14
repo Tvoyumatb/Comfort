@@ -1,4 +1,4 @@
-const APP_VERSION = "93";
+const APP_VERSION = "94";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1104,6 +1104,36 @@ function ensureCoalItem(name) {
   const created = { id: uid(), name, start: 0 };
   stock.push(created);
   return created;
+}
+
+function renameLinkedStock(oldName, nextName, kind) {
+  const from = String(oldName || "").trim();
+  const to = String(nextName || "").trim();
+  if (!from || !to || from.toLowerCase() === to.toLowerCase()) return to || from;
+  const rowKind = kind === "coal" ? "coal" : "inventory";
+  (state.tobacco || []).forEach((row) => {
+    if ((row.kind || "tobacco") === rowKind && String(row.product || "").toLowerCase() === from.toLowerCase()) {
+      row.product = to;
+    }
+  });
+  if (kind !== "coal") {
+    (state.fines || []).forEach((row) => {
+      if (String(row.what || "").toLowerCase() === from.toLowerCase()) row.what = to;
+    });
+  }
+  return to;
+}
+
+function setStockNow(item, nextNow) {
+  const incoming = incomingQtyFor(item.name);
+  const broken = fineQtyFor(item.name);
+  item.start = Number(nextNow || 0) - incoming + broken;
+}
+
+function setCoalNow(item, nextNow) {
+  const per = coalPackSize(item);
+  item.startPacks = Number(nextNow || 0) - incomingCoalPacks(item.name, per);
+  item.start = item.startPacks * per;
 }
 
 function incomingQtyFor(name, kind = "inventory") {
@@ -2489,18 +2519,33 @@ function renderTobacco() {
   renderInventoryStock();
 }
 
-function hallCard(item, { now, income, broken, restockAttr, delAttr, unit = "шт", need = 0, extra = "" }) {
+function hallCard(item, { now, income, broken, restockAttr, delAttr, unit = "шт", need = 0, extra = "", coal = false }) {
   const tags = [
     income ? `<span class="hall-tag in">пришло +${income}</span>` : "",
     broken ? `<span class="hall-tag out">сломали −${broken}</span>` : "",
   ].join("");
+  const nowValue = coal ? coalNow(item) : stockNow(item);
+  const nameAttr = coal ? "data-coal-name" : "data-stock-name";
+  const nowAttr = coal ? "data-coal-now" : "data-stock-now";
+  const kindSelect = coal ? "" : `
+    <label class="hall-kind">тип
+      <select data-stock-kind="${item.id}">
+        <option value="bowl"${stockKind(item) === "bowl" ? " selected" : ""}>чаша</option>
+        <option value="item"${stockKind(item) === "item" ? " selected" : ""}>инвентарь</option>
+      </select>
+    </label>
+  `;
   return `
     <article class="hall-card ${need ? "is-need" : ""}">
+      <input type="text" class="hall-name" ${nameAttr}="${item.id}" value="${escapeHtml(item.name)}" aria-label="Название">
       <div class="hall-card-top">
-        <h3>${escapeHtml(item.name)}</h3>
-        <b>${now} ${unit}</b>
+        <label class="hall-now">сейчас
+          <input type="number" min="0" step="${coal ? "0.1" : "1"}" value="${nowValue}" ${nowAttr}="${item.id}">
+          <span>${coal ? "кор." : unit}</span>
+        </label>
       </div>
       <p class="hall-tags">${tags}</p>
+      ${kindSelect}
       ${extra}
       ${need ? `<button type="button" class="primary compact" ${restockAttr}="${escapeHtml(item.name)}">Закупили ${need} шт</button>` : ""}
       <button type="button" class="text-del" ${delAttr}="${item.id}">убрать</button>
@@ -2552,6 +2597,7 @@ function renderInventoryStock() {
               restockAttr: "data-restock-coal",
               delAttr: "data-del-coal-stock",
               extra: `<label class="hall-pack">в коробке <input type="number" min="1" step="1" value="${coalPackSize(item)}" data-coal-pack="${item.id}"></label>`,
+              coal: true,
             }
           : {
               now: stockNow(item),
@@ -3559,6 +3605,57 @@ document.addEventListener("click", (e) => {
   const coalStockId = e.target.dataset.delCoalStock;
   if (coalStockId) {
     state.coalStock = ensureCoalStock().filter((item) => item.id !== coalStockId);
+    save();
+    renderLounge();
+    renderTobacco();
+  }
+});
+
+document.addEventListener("change", (e) => {
+  const stockNameId = e.target.dataset.stockName;
+  if (stockNameId) {
+    const item = ensureInventory().find((row) => row.id === stockNameId);
+    if (!item) return;
+    item.name = renameLinkedStock(item.name, e.target.value, "item") || item.name;
+    save();
+    renderLounge();
+    renderTobacco();
+    return;
+  }
+  const coalNameId = e.target.dataset.coalName;
+  if (coalNameId) {
+    const item = ensureCoalStock().find((row) => row.id === coalNameId);
+    if (!item) return;
+    item.name = renameLinkedStock(item.name, e.target.value, "coal") || item.name;
+    save();
+    renderLounge();
+    renderTobacco();
+    return;
+  }
+  const stockNowId = e.target.dataset.stockNow;
+  if (stockNowId) {
+    const item = ensureInventory().find((row) => row.id === stockNowId);
+    if (!item) return;
+    setStockNow(item, e.target.value);
+    save();
+    renderLounge();
+    return;
+  }
+  const coalNowId = e.target.dataset.coalNow;
+  if (coalNowId) {
+    const item = ensureCoalStock().find((row) => row.id === coalNowId);
+    if (!item) return;
+    setCoalNow(item, e.target.value);
+    syncOpeningCoals();
+    save();
+    renderLounge();
+    return;
+  }
+  const kindId = e.target.dataset.stockKind;
+  if (kindId) {
+    const item = ensureInventory().find((row) => row.id === kindId);
+    if (!item) return;
+    item.kind = e.target.value === "bowl" ? "bowl" : "item";
     save();
     renderLounge();
     renderTobacco();
