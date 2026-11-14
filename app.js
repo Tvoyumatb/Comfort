@@ -1,4 +1,4 @@
-const APP_VERSION = "98";
+const APP_VERSION = "99";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -142,7 +142,7 @@ const INCOME = {
   },
   inventory: {
     title: "Приход инвентаря",
-    hint: "Только чек. Остаток в зале сам не плюсуется — число «сейчас» правишь там",
+    hint: "В зале видно приход этого месяца. При обновлении кода чаши не удваиваются",
     name: "Наименование",
     placeholder: "Колба, шланг",
     qty: "Количество, шт",
@@ -152,7 +152,7 @@ const INCOME = {
   },
   coal: {
     title: "Приход угля",
-    hint: "Чек по коробкам. В зале число коробок сам не плюсуется",
+    hint: "Сначала добавь название угля, потом коробки. Обычно 72 шт в коробке",
     name: "Название угля",
     placeholder: "CocoNara, Tom Coco...",
     qty: "Пачек",
@@ -1155,12 +1155,12 @@ function renameLinkedStock(oldName, nextName, kind) {
 }
 
 function setStockNow(item, nextNow) {
-  item.start = Number(nextNow || 0) + fineQtyFor(item.name);
+  item.start = Number(nextNow || 0) - incomingQtyFor(item.name) + fineQtyFor(item.name);
 }
 
 function setCoalNow(item, nextNow) {
   const per = coalPackSize(item);
-  item.startPacks = Number(nextNow || 0);
+  item.startPacks = Number(nextNow || 0) - incomingCoalPacks(item.name, per);
   item.start = item.startPacks * per;
 }
 
@@ -2192,23 +2192,23 @@ function remainCoals(rev, fromDate) {
     - staffHookahsInWindow(fromDate) * coalsPerHookah();
 }
 
-function freezeLoungeFromIncoming() {
-  if (state.loungeNoAutoIncomeV1) return;
+function unfreezeLoungeFromIncoming() {
+  if (!state.loungeNoAutoIncomeV1) return;
   ensureInventory().forEach((item) => {
-    item.start = Number(item.start || 0) + incomingQtyFor(item.name);
+    item.start = Number(item.start || 0) - incomingQtyFor(item.name);
   });
   ensureCoalStock().forEach((item) => {
     const per = coalPackSize(item);
     const startPacks = item.startPacks != null ? Number(item.startPacks || 0) : Number(item.start || 0) / per;
-    item.startPacks = startPacks + incomingCoalPacks(item.name, per);
+    item.startPacks = startPacks - incomingCoalPacks(item.name, per);
     item.start = item.startPacks * per;
   });
-  state.loungeNoAutoIncomeV1 = true;
+  state.loungeNoAutoIncomeV1 = false;
   save();
 }
 
 function stockNow(item) {
-  return Number(item.start || 0) - fineQtyFor(item.name);
+  return Number(item.start || 0) + incomingQtyFor(item.name) - fineQtyFor(item.name);
 }
 
 function itemNeedBuy(item) {
@@ -2332,8 +2332,8 @@ function undoFalseBuys() {
 
 function coalNow(item) {
   const per = coalPackSize(item);
-  if (item.startPacks != null) return Number(item.startPacks || 0);
-  return Number(item.start || 0) / per;
+  const startPacks = item.startPacks != null ? Number(item.startPacks || 0) : Number(item.start || 0) / per;
+  return startPacks + incomingCoalPacks(item.name, per);
 }
 
 function namedCoalOpening() {
@@ -2824,7 +2824,7 @@ function renderInventoryStock() {
 
 function renderLounge() {
   undoFalseBuys();
-  freezeLoungeFromIncoming();
+  unfreezeLoungeFromIncoming();
   renderLoungeAlerts();
   renderInventoryStock();
   renderFines();
@@ -3543,6 +3543,7 @@ function saveInvoiceDraft() {
     }
     const product = String(row.product || "").trim();
     if (!product) return;
+    seedStockItem(state, product, /чаш|hype|хайп/i.test(product) ? "bowl" : "item");
     state.tobacco.push({
       id: uid(),
       kind: "inventory",
@@ -3724,6 +3725,9 @@ $("#tobaccoForm").addEventListener("submit", (e) => {
     let product = (data.stockProduct || data.product || "").trim();
     if (kind === "inventory" && !product) return;
     if (kind === "tobacco" && !product) return;
+    if (kind === "inventory" && !isConsumable(product)) {
+      product = ensureStockItem(product, /чаш|hype|хайп/i.test(product) ? "bowl" : "item").name;
+    }
     state.tobacco.push({
       id: uid(),
       kind,
