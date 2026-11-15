@@ -1,4 +1,4 @@
-const APP_VERSION = "110";
+const APP_VERSION = "111";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -638,7 +638,9 @@ function dbFill(raw) {
   let n = 0;
   Object.values(venues).forEach((venue) => {
     if (!venue) return;
-    n += Object.keys(venue.schedule || {}).length;
+    Object.values(venue.schedule || {}).forEach((day) => {
+      n += Object.keys(day || {}).length;
+    });
     n += (venue.tobacco || []).length;
     n += (venue.fines || []).length;
     n += (venue.hookahSales || []).length;
@@ -648,9 +650,131 @@ function dbFill(raw) {
   return n;
 }
 
+function packedVenuesJson(raw) {
+  try {
+    return JSON.stringify(raw?.venues || {});
+  } catch {
+    return "";
+  }
+}
+
+function mergeRows(older = [], newer = []) {
+  const map = new Map();
+  [...older, ...newer].forEach((row) => {
+    if (!row) return;
+    const key = row.id != null ? `id:${row.id}` : "";
+    if (!key) return;
+    map.set(key, row);
+  });
+  const leftover = [...older, ...newer].filter((row) => row && row.id == null);
+  return leftover.length ? [...map.values(), ...leftover] : [...map.values()];
+}
+
+function mergeRowsBy(older = [], newer = [], keyFn) {
+  const map = new Map();
+  [...older, ...newer].forEach((row) => {
+    if (!row) return;
+    const key = keyFn(row);
+    if (!key) return;
+    map.set(String(key), row);
+  });
+  return [...map.values()];
+}
+
+function mergeSchedule(older = {}, newer = {}) {
+  const out = {};
+  new Set([...Object.keys(older || {}), ...Object.keys(newer || {})]).forEach((iso) => {
+    const a = older?.[iso] || {};
+    const b = newer?.[iso] || {};
+    const day = {};
+    new Set([...Object.keys(a), ...Object.keys(b)]).forEach((emp) => {
+      const val = b[emp] || a[emp];
+      if (val) day[emp] = val;
+    });
+    if (Object.keys(day).length) out[iso] = day;
+  });
+  return out;
+}
+
+function mergeExtras(older = {}, newer = {}) {
+  const out = { ...older };
+  Object.keys(newer || {}).forEach((period) => {
+    const a = older?.[period] || {};
+    const b = newer[period] || {};
+    out[period] = { ...a };
+    Object.keys(b).forEach((emp) => {
+      const left = a[emp] || {};
+      const right = b[emp] || {};
+      out[period][emp] = {
+        fines: Math.max(Number(left.fines || 0), Number(right.fines || 0)),
+        advances: Math.max(Number(left.advances || 0), Number(right.advances || 0)),
+        damage: Math.max(Number(left.damage || 0), Number(right.damage || 0)),
+      };
+    });
+  });
+  return out;
+}
+
+function mergeEmployees(older = [], newer = []) {
+  const byName = new Map();
+  [...older, ...newer].forEach((emp) => {
+    if (!emp || isPlaceholderEmployee(emp)) return;
+    const key = normalizeName(emp.name);
+    if (!key) return;
+    const prev = byName.get(key);
+    if (!prev) {
+      byName.set(key, { ...emp });
+      return;
+    }
+    if (emp.id && !prev.id) prev.id = emp.id;
+    if (!emp.leftOn) prev.leftOn = "";
+  });
+  return [...byName.values()];
+}
+
+function mergeVenue(older, newer) {
+  if (!older) return newer;
+  if (!newer) return older;
+  return {
+    ...older,
+    ...newer,
+    employees: mergeEmployees(older.employees, newer.employees),
+    schedule: mergeSchedule(older.schedule, newer.schedule),
+    extras: mergeExtras(older.extras, newer.extras),
+    rates: { ...DEFAULT_RATES, ...(older.rates || {}), ...(newer.rates || {}) },
+    rateNames: { ...DEFAULT_RATE_NAMES, ...(older.rateNames || {}), ...(newer.rateNames || {}) },
+    shiftNames: { ...DEFAULT_SHIFT_NAMES, ...(older.shiftNames || {}), ...(newer.shiftNames || {}) },
+    tobacco: mergeRows(older.tobacco, newer.tobacco),
+    fines: mergeRows(older.fines, newer.fines),
+    hookahSales: mergeRows(older.hookahSales, newer.hookahSales),
+    revisions: mergeRowsBy(older.revisions, newer.revisions, (rev) => rev.month || rev.date || rev.id),
+    inventoryStock: newer.inventoryStock?.length ? newer.inventoryStock : older.inventoryStock,
+    coalStock: newer.coalStock?.length ? newer.coalStock : older.coalStock,
+    checklist: newer.checklist || older.checklist,
+  };
+}
+
+function mergePacked(local, incoming) {
+  if (!incoming?.venues) return local;
+  if (!local?.venues) return incoming;
+  const localNewer = Number(local.updatedAt || 0) >= Number(incoming.updatedAt || 0);
+  const older = localNewer ? incoming : local;
+  const newer = localNewer ? local : incoming;
+  return {
+    app: "comfort-journal",
+    updatedAt: Math.max(Number(local.updatedAt || 0), Number(incoming.updatedAt || 0)),
+    current: local.current,
+    venues: {
+      tangiers: mergeVenue(older.venues?.tangiers, newer.venues?.tangiers),
+      shishka: mergeVenue(older.venues?.shishka, newer.venues?.shishka),
+    },
+  };
+}
+
 function shouldUseRemote(remote, local) {
   if (!remote?.venues) return false;
-  return dbFill(remote) > dbFill(local);
+  const merged = mergePacked(local, remote);
+  return packedVenuesJson(merged) !== packedVenuesJson(local);
 }
 
 function applyCloud(raw) {
@@ -804,9 +928,12 @@ function handleCloudMessage(text) {
   if (!remote?.venues) return;
   lastRemote = remote;
   if (cloudApplying) return;
-  if (shouldUseRemote(remote, db)) {
-    applyRemote(remote, "Подтянул свежие данные");
+  const merged = mergePacked(packedDb(), remote);
+  if (packedVenuesJson(merged) === packedVenuesJson(packedDb())) {
+    setSyncStatus("Данные с телефона и ноута");
+    return;
   }
+  applyRemote(merged, "Подтянул свежие данные");
 }
 
 function liveMqttSockets() {
@@ -814,19 +941,25 @@ function liveMqttSockets() {
 }
 
 function pushCloud() {
-  if (lastRemote && dbFill(db) < dbFill(lastRemote)) {
-    setSyncStatus("На устройстве меньше данных — облако не трогаю");
-    return false;
-  }
   const open = liveMqttSockets();
   if (!open.length) {
     setSyncStatus("Нет сети — пока только на этом устройстве");
     mqttConnectAll();
     return false;
   }
-  const body = JSON.stringify(packedDb());
+  const outgoing = lastRemote ? mergePacked(packedDb(), lastRemote) : packedDb();
+  if (packedVenuesJson(outgoing) !== packedVenuesJson(packedDb())) {
+    cloudApplying = true;
+    applyCloud(outgoing);
+    saveLocal();
+    syncVenueUi();
+    render();
+    cloudApplying = false;
+  }
+  const body = JSON.stringify(outgoing);
   const packet = mqttPublishPacket(body);
   open.forEach((ws) => ws.send(packet));
+  lastRemote = outgoing;
   setSyncStatus("Сохранено на телефон и ноут");
   return true;
 }
@@ -918,8 +1051,8 @@ async function bootCloud() {
   navigator.storage?.persist?.().catch(() => {});
   setSyncStatus("Загружаю общие данные…");
   const backup = await loadRestoreCopy();
-  if (shouldUseRemote(backup, db)) {
-    applyRemote(backup, "Вернул сохранённый журнал");
+  if (backup?.venues && shouldUseRemote(backup, db)) {
+    applyRemote(mergePacked(packedDb(), backup), "Вернул сохранённый журнал");
   }
   mqttConnectAll();
   startMqttPing();
@@ -930,15 +1063,13 @@ async function bootCloud() {
   cloudReady = true;
   await new Promise((resolve) => window.setTimeout(resolve, 1500));
   const richest = pickRicher(pickRicher(packedDb(), lastRemote), backup);
-  if (shouldUseRemote(richest, db)) {
-    applyRemote(richest, "Вернул сохранённый журнал");
+  if (richest?.venues && shouldUseRemote(richest, db)) {
+    applyRemote(mergePacked(packedDb(), richest), "Вернул сохранённый журнал");
   }
   if (!liveMqttSockets().length) {
     setSyncStatus("Нет сети — пока только на этом устройстве");
-  } else if (dbFill(db) >= dbFill(lastRemote || {})) {
-    pushCloud();
   } else {
-    setSyncStatus("Данные с телефона и ноута");
+    pushCloud();
   }
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") mqttConnectAll();
@@ -947,10 +1078,12 @@ async function bootCloud() {
   $("#syncStatus")?.addEventListener("click", async () => {
     setSyncStatus("Обновляю…");
     const copy = await loadRestoreCopy();
-    if (shouldUseRemote(copy, db)) applyRemote(copy, "Вернул сохранённый журнал");
+    if (copy?.venues && shouldUseRemote(copy, db)) {
+      applyRemote(mergePacked(packedDb(), copy), "Вернул сохранённый журнал");
+    }
     mqttConnectAll();
-    if (lastRemote && shouldUseRemote(lastRemote, db)) {
-      applyRemote(lastRemote, "Подтянул свежие данные");
+    if (lastRemote?.venues && shouldUseRemote(lastRemote, db)) {
+      applyRemote(mergePacked(packedDb(), lastRemote), "Подтянул свежие данные");
     }
     pushCloud();
   });
