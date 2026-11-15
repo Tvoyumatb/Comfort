@@ -1,4 +1,4 @@
-const APP_VERSION = "111";
+const APP_VERSION = "112";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -778,8 +778,9 @@ function shouldUseRemote(remote, local) {
 }
 
 function applyCloud(raw) {
+  const keep = db.current;
   const next = unpackDb(raw);
-  db.current = next.current;
+  db.current = VENUES[keep] ? keep : next.current;
   db.updatedAt = next.updatedAt;
   db.venues = next.venues;
   state = db.venues[db.current];
@@ -796,6 +797,8 @@ function setSyncStatus(text) {
 
 function save() {
   db.updatedAt = Date.now();
+  lastLocalEdit = db.updatedAt;
+  ignoreRemoteUntil = Date.now() + 3500;
   saveLocal();
   queueCloudPush();
 }
@@ -805,6 +808,9 @@ let cloudApplying = false;
 let cloudTimer = 0;
 let mqttPing = 0;
 let lastRemote = null;
+let lastPushJson = "";
+let lastLocalEdit = 0;
+let ignoreRemoteUntil = 0;
 const mqttSockets = [];
 const mqttEncoder = new TextEncoder();
 const mqttDecoder = new TextDecoder();
@@ -924,10 +930,15 @@ function applyRemote(remote, status) {
 }
 
 function handleCloudMessage(text) {
+  if (text && text === lastPushJson) {
+    setSyncStatus("Сохранено на телефон и ноут");
+    return;
+  }
   const remote = asJournal(text);
   if (!remote?.venues) return;
   lastRemote = remote;
   if (cloudApplying) return;
+  if (Date.now() < ignoreRemoteUntil) return;
   const merged = mergePacked(packedDb(), remote);
   if (packedVenuesJson(merged) === packedVenuesJson(packedDb())) {
     setSyncStatus("Данные с телефона и ноута");
@@ -948,18 +959,11 @@ function pushCloud() {
     return false;
   }
   const outgoing = lastRemote ? mergePacked(packedDb(), lastRemote) : packedDb();
-  if (packedVenuesJson(outgoing) !== packedVenuesJson(packedDb())) {
-    cloudApplying = true;
-    applyCloud(outgoing);
-    saveLocal();
-    syncVenueUi();
-    render();
-    cloudApplying = false;
-  }
   const body = JSON.stringify(outgoing);
+  lastPushJson = body;
+  lastRemote = outgoing;
   const packet = mqttPublishPacket(body);
   open.forEach((ws) => ws.send(packet));
-  lastRemote = outgoing;
   setSyncStatus("Сохранено на телефон и ноут");
   return true;
 }
@@ -988,7 +992,7 @@ function queueCloudPush() {
       return;
     }
     pushCloud();
-  }, 300);
+  }, 700);
 }
 
 function bindMqttSocket(ws, url) {
@@ -1187,7 +1191,7 @@ function remapEmpId(venue, fromId, toId) {
   if (!venue || !fromId || fromId === toId) return;
   Object.values(venue.schedule || {}).forEach((day) => {
     if (!day || day[fromId] == null) return;
-    if (day[toId] == null) day[toId] = day[fromId];
+    if (day[fromId]) day[toId] = day[fromId];
     delete day[fromId];
   });
   Object.values(venue.extras || {}).forEach((period) => {
