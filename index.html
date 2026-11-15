@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "101";
+      var BUILD = "102";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -108,24 +108,17 @@
         <button type="button" class="icon-btn" id="prevPeriod" aria-label="Предыдущие 2 недели">‹</button>
         <div class="period-label">
           <strong id="periodRange">—</strong>
-          <span id="periodHint">Каждые 2 недели сохраняются отдельно</span>
+          <span id="periodHint">Сотрудники общие. Смены у Tangiers и Shishka отдельные</span>
         </div>
         <button type="button" class="icon-btn" id="nextPeriod" aria-label="Следующие 2 недели">›</button>
       </div>
 
-      <div class="rates" id="ratesBox"></div>
-
-      <div class="excel-card">
-        <div class="roster-wrap" id="rosterWrap"></div>
-      </div>
+      <div id="timesheetVenues"></div>
 
       <form class="add-brand" id="addEmployeeForm">
-        <input type="text" name="name" placeholder="Добавить сотрудника" required>
+        <input type="text" name="name" placeholder="Добавить сотрудника в оба филиала" required>
         <button type="submit" class="primary compact">+</button>
       </form>
-
-      <h2 class="block-title">Расчёт за период</h2>
-      <div class="excel-card pay-wrap" id="payWrap"></div>
 
       <p class="hint">Порча колбы, чаши и прочего — во вкладке Зал. Там же остатки и напоминание закупить.</p>
     </section>

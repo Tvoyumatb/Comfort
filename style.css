@@ -219,6 +219,18 @@ h1 {
   padding: 0 var(--pad) 8px;
 }
 
+body[data-tab="shifts"] .venues {
+  display: none;
+}
+
+.timesheet-venue {
+  margin: 0 0 22px;
+}
+
+.timesheet-venue .block-title {
+  margin-top: 4px;
+}
+
 .venue {
   font: inherit;
   cursor: pointer;
