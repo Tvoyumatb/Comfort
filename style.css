@@ -223,31 +223,42 @@ body[data-tab="shifts"] .venues {
   display: none;
 }
 
-.rates-duo {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.rates-block {
-  padding: 10px;
+.timesheet-venue {
+  margin: 0 0 22px;
+  padding: 8px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 16px;
 }
 
-.rates-block h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
-.rates-block.venue-tangiers {
+.timesheet-venue.venue-tangiers {
   border-color: #ff6b35;
-  background: color-mix(in srgb, #ff6b35 12%, transparent);
+  background: color-mix(in srgb, #ff6b35 10%, transparent);
 }
 
-.rates-block.venue-shishka {
-  border-color: #3d7ec9;
-  background: color-mix(in srgb, #3d7ec9 12%, transparent);
+.timesheet-venue.venue-shishka {
+  border-color: #7ab8ff;
+  background: color-mix(in srgb, #7ab8ff 10%, transparent);
+}
+
+.timesheet-place {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+.timesheet-venue.venue-tangiers .timesheet-place {
+  background: #ff6b35;
+  color: #fff;
+}
+
+.timesheet-venue.venue-shishka .timesheet-place {
+  background: #3d7ec9;
+  color: #fff;
+}
+
+.timesheet-venue .block-title {
+  margin-top: 4px;
 }
 
 .venue {
@@ -1143,62 +1154,6 @@ input[type="number"] {
   line-height: 1.2;
 }
 
-.roster-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 8px;
-  padding: 0 4px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.roster-legend .mark {
-  padding: 4px 8px;
-  border-radius: 8px;
-}
-
-.roster-legend .mark.venue-tangiers {
-  background: #ff6b35;
-  color: #fff;
-}
-
-.roster-legend .mark.venue-shishka {
-  background: #3d7ec9;
-  color: #fff;
-}
-
-.roster .day-head {
-  min-width: 88px;
-}
-
-.roster th.sub {
-  min-width: 44px;
-  height: 26px;
-  font-size: 10px;
-}
-
-.roster th.sub.venue-tangiers,
-.roster td.venue-tangiers {
-  background: #fff4ee;
-}
-
-.roster th.sub.venue-shishka,
-.roster td.venue-shishka {
-  background: #eef5ff;
-}
-
-.pay-split td.venue-tangiers,
-.pay-split th:nth-child(2),
-.pay-split th:nth-child(3) {
-  background: #fff4ee;
-}
-
-.pay-split td.venue-shishka,
-.pay-split th:nth-child(4),
-.pay-split th:nth-child(5) {
-  background: #eef5ff;
-}
 
 .roster thead .name, .pay thead .name {
   background: #f3f3f3;
@@ -1207,17 +1162,43 @@ input[type="number"] {
 
 .cell {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0;
   width: 100%;
-  min-height: 42px;
+  min-height: 40px;
   padding: 2px 0;
   border: 0;
-  background: transparent;
+  background: #fff;
   color: #888;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  line-height: 1.05;
+}
+
+.cell-place {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.cell.elsewhere {
+  background: #ececec;
+  color: #555;
+}
+
+.cell.elsewhere.venue-tangiers {
+  background: #ffe0d2;
+  color: #c45120;
+}
+
+.cell.elsewhere.venue-shishka {
+  background: #d6e6fb;
+  color: #245a9a;
 }
 
 .cell.morning { background: #fff200; color: #111; }
@@ -1483,30 +1464,11 @@ input[type="number"] {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  grid-template-columns: minmax(110px, 8.4em) repeat(calc(var(--days, 15) * 2), minmax(22px, 1fr));
+  grid-template-columns: minmax(110px, 8.4em) repeat(var(--days, 15), minmax(36px, 1fr));
   background: #fff;
   border-top: 1px solid #b4b4b4;
   border-left: 1px solid #b4b4b4;
   font-size: 11px;
-}
-
-.report-timesheet .rt-day {
-  grid-column: span 2;
-}
-
-.report-timesheet .rt-sub {
-  font-size: 8px;
-  padding: 2px 1px;
-}
-
-.report-timesheet .rt-sub.venue-tangiers,
-.report-timesheet .rt-shift.venue-tangiers:not(.morning):not(.evening-wd):not(.evening-we):not(.intern) {
-  background: #fff4ee;
-}
-
-.report-timesheet .rt-sub.venue-shishka,
-.report-timesheet .rt-shift.venue-shishka:not(.morning):not(.evening-wd):not(.evening-we):not(.intern) {
-  background: #eef5ff;
 }
 
 .report-timesheet > * {

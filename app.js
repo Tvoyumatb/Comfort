@@ -1,4 +1,4 @@
-const APP_VERSION = "106";
+const APP_VERSION = "107";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -944,15 +944,48 @@ function venueIds() {
   return Object.keys(VENUES);
 }
 
+function otherVenueId(id) {
+  return id === "shishka" ? "tangiers" : "shishka";
+}
+
+function shiftOn(venueId, empId, iso) {
+  return shiftType(venueState(venueId).schedule?.[iso]?.[empId] || "");
+}
+
 function shiftCellHtml(type) {
   return escapeHtml(SHIFT_LABEL[type] || "/");
 }
 
-function venueShiftButton(venueId, empId, date) {
+function elsewhereMark(venueId, empId, iso) {
+  const other = otherVenueId(venueId);
+  const type = shiftOn(other, empId, iso);
+  return type ? { other, type } : null;
+}
+
+function cellContentHtml(venueId, empId, date) {
   const iso = toISODate(date);
-  const type = shiftType(venueState(venueId).schedule?.[iso]?.[empId] || "");
-  const cls = shiftClass(type, date);
-  return `<td class="venue-col venue-${venueId}"><button type="button" class="cell ${cls} venue-${venueId}" data-emp="${empId}" data-day="${iso}" data-venue="${venueId}">${shiftCellHtml(type)}</button></td>`;
+  const type = shiftOn(venueId, empId, iso);
+  if (type) return shiftCellHtml(type);
+  const away = elsewhereMark(venueId, empId, iso);
+  if (away) {
+    return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${escapeHtml(SHIFT_LABEL[away.type])}</span>`;
+  }
+  return shiftCellHtml("");
+}
+
+function cellClassName(venueId, empId, date) {
+  const iso = toISODate(date);
+  const type = shiftOn(venueId, empId, iso);
+  if (type) return `cell ${shiftClass(type, date)}`;
+  const away = elsewhereMark(venueId, empId, iso);
+  if (away) return `cell elsewhere venue-${away.other}`;
+  return "cell";
+}
+
+function paintShiftButton(btn) {
+  const date = parseISODate(btn.dataset.day);
+  btn.innerHTML = cellContentHtml(btn.dataset.venue, btn.dataset.emp, date);
+  btn.className = cellClassName(btn.dataset.venue, btn.dataset.emp, date);
 }
 
 function setVenue(id) {
@@ -1410,16 +1443,13 @@ function activeEmployees() {
   return sharedEmployees().filter((emp) => !emp.leftOn);
 }
 
-function rosterHtml() {
+function rosterHtml(venueId) {
   const days = periodDays();
   const people = visibleEmployeesAll();
   const head = `
     <tr>
-      <th class="name" rowspan="2">${MONTHS_RU[viewMonth.getMonth()]}</th>
-      ${days.map((d) => `<th class="day-head" colspan="2">${d.getDate()}</th>`).join("")}
-    </tr>
-    <tr>
-      ${days.map(() => venueIds().map((id) => `<th class="sub venue-${id}">${escapeHtml(venueShort(id))}</th>`).join("")).join("")}
+      <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
+      ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
     </tr>
   `;
   const body = people.map((emp) => `
@@ -1428,73 +1458,42 @@ function rosterHtml() {
         ${escapeHtml(emp.name)}
         <button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>
       </th>
-      ${days.map((date) => venueIds().map((id) => venueShiftButton(id, emp.id, date)).join("")).join("")}
+      ${days.map((date) => {
+        const iso = toISODate(date);
+        return `<td><button type="button" class="${cellClassName(venueId, emp.id, date)}" data-emp="${emp.id}" data-day="${iso}" data-venue="${venueId}">${cellContentHtml(venueId, emp.id, date)}</button></td>`;
+      }).join("")}
     </tr>
   `).join("");
-  return `
-    <p class="roster-legend">
-      <span class="mark venue-tangiers">оранжевая колонка — Танж</span>
-      <span class="mark venue-shishka">синяя колонка — Шишка</span>
-    </p>
-    <table class="roster roster-duo"><thead>${head}</thead><tbody>${body}</tbody></table>
-  `;
+  return `<table class="roster"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
-function allRatesHtml() {
-  return venueIds().map((id) => `
-    <div class="rates-block venue-${id}">
-      <h3>${escapeHtml(venueShort(id))} · ставки</h3>
-      <div class="rates">${ratesHtml(venueState(id), id)}</div>
-    </div>
-  `).join("");
-}
-
-function shiftCountShort(c) {
-  return `${c.morning}у ${c.eveningWeekday}б ${c.eveningWeekend}в ${c.intern}с`;
-}
-
-function empPayBits(emp) {
-  return venueIds().reduce((acc, id) => {
-    const venue = venueState(id);
+function payHtml(venue, venueId) {
+  const rows = visibleEmployeesAll().map((emp) => {
+    const c = countShiftsIn(venue, emp.id);
     const extra = extrasForVenue(venue, emp.id);
-    acc[id] = {
-      counts: countShiftsIn(venue, emp.id),
-      pay: payoutIn(venue, emp.id),
-      fines: Number(extra.fines || 0) + damageTotalIn(venue, emp.id),
-    };
-    return acc;
-  }, {});
-}
-
-function payHtmlAll() {
-  const people = visibleEmployeesAll();
-  const rows = people.map((emp) => {
-    const bits = empPayBits(emp);
-    const t = bits.tangiers;
-    const s = bits.shishka;
     return `
       <tr>
         <th class="name">${escapeHtml(emp.name)}</th>
-        <td class="venue-tangiers">${shiftCountShort(t.counts)}</td>
-        <td class="sum venue-tangiers">${formatSum(t.pay)}</td>
-        <td class="venue-shishka">${shiftCountShort(s.counts)}</td>
-        <td class="sum venue-shishka">${formatSum(s.pay)}</td>
-        <td>${formatSum(t.fines + s.fines)}</td>
-        <td class="sum">${formatSum(t.pay + s.pay)}</td>
+        <td>${c.morning}</td>
+        <td>${c.eveningWeekday}</td>
+        <td>${c.eveningWeekend}</td>
+        <td>${c.intern}</td>
+        <td>${formatSum(Number(extra.fines || 0) + damageTotalIn(venue, emp.id))}</td>
+        <td class="sum" data-pay-sum="${emp.id}" data-venue="${venueId}">${formatSum(payoutIn(venue, emp.id))}</td>
       </tr>
     `;
   }).join("");
   return `
-    <table class="pay pay-split">
+    <table class="pay">
       <thead>
         <tr>
           <th class="name">Сотрудник</th>
-          <th>Танж смены</th>
-          <th>Танж ₽</th>
-          <th>Шишка смены</th>
-          <th>Шишка ₽</th>
+          <th>Утро</th>
+          <th>Вечер будние</th>
+          <th>Вечер выходные</th>
+          <th>Стажировка</th>
           <th>Порча / штраф</th>
-          <th>Итого</th>
+          <th>К выплате</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -1502,13 +1501,13 @@ function payHtmlAll() {
   `;
 }
 
-function renderPayFor() {
-  renderPay();
+function renderPayFor(venueId) {
+  const box = document.querySelector(`[data-pay="${venueId}"]`);
+  if (box) box.innerHTML = payHtml(venueState(venueId), venueId);
 }
 
 function renderPay() {
-  const box = document.querySelector("[data-pay]");
-  if (box) box.innerHTML = payHtmlAll();
+  venueIds().forEach(renderPayFor);
 }
 
 function renderFines() {
@@ -1551,14 +1550,20 @@ function renderShifts() {
   renderPeriod();
   const box = $("#timesheetVenues");
   if (box) {
-    box.innerHTML = `
-      <div class="rates-duo">${allRatesHtml()}</div>
-      <div class="excel-card">
-        <div class="roster-wrap">${rosterHtml()}</div>
-      </div>
-      <h2 class="block-title">Расчёт</h2>
-      <div class="excel-card pay-wrap" data-pay>${payHtmlAll()}</div>
-    `;
+    box.innerHTML = venueIds().map((id) => {
+      const venue = venueState(id);
+      return `
+        <section class="timesheet-venue venue-${id}" data-timesheet="${id}">
+          <h2 class="block-title timesheet-place">${escapeHtml(venueShort(id))} · ${escapeHtml(VENUES[id])}</h2>
+          <div class="rates">${ratesHtml(venue, id)}</div>
+          <div class="excel-card">
+            <div class="roster-wrap">${rosterHtml(id)}</div>
+          </div>
+          <h2 class="block-title">Расчёт · ${escapeHtml(venueShort(id))}</h2>
+          <div class="excel-card pay-wrap" data-pay="${id}">${payHtml(venue, id)}</div>
+        </section>
+      `;
+    }).join("");
   }
   renderFines();
   if (!$("#reportView")?.hidden) refreshOpenReport();
@@ -1569,65 +1574,51 @@ function reportPeriodLabel() {
   return `${MONTHS_RU[viewMonth.getMonth()]} ${days[0].getDate()}–${days[days.length - 1].getDate()} ${viewMonth.getFullYear()}`;
 }
 
-function timesheetReportHtml() {
+function timesheetReportHtml(venueId) {
+  const venue = venueState(venueId);
   const days = periodDays();
   const nameHtml = (text) => escapeHtml(text).replace(" ", "<br>");
   const people = visibleEmployeesAll();
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
-    `<div class="rt-head rt-name"></div>`,
-    ...days.flatMap(() => venueIds().map((id) => `<div class="rt-head rt-sub venue-${id}">${escapeHtml(venueShort(id))}</div>`)),
     ...people.flatMap((emp) => [
       `<div class="rt-name">${nameHtml(emp.name)}</div>`,
-      ...days.flatMap((date) => venueIds().map((id) => {
-        const type = shiftType(venueState(id).schedule?.[toISODate(date)]?.[emp.id] || "");
-        const cls = shiftClass(type, date);
-        return `<div class="rt-shift cell ${cls} venue-${id}">${shiftCellHtml(type)}</div>`;
-      })),
+      ...days.map((date) => `<div class="rt-shift ${cellClassName(venueId, emp.id, date)}">${cellContentHtml(venueId, emp.id, date)}</div>`),
     ]),
   ].join("");
 
   const payRows = people.map((emp) => {
-    const bits = empPayBits(emp);
-    const t = bits.tangiers;
-    const s = bits.shishka;
+    const c = countShiftsIn(venue, emp.id);
+    const extra = extrasForVenue(venue, emp.id);
     return `
       <tr>
         <th class="name">${escapeHtml(emp.name)}</th>
-        <td class="venue-tangiers">${shiftCountShort(t.counts)}</td>
-        <td class="sum venue-tangiers">${formatSum(t.pay)}</td>
-        <td class="venue-shishka">${shiftCountShort(s.counts)}</td>
-        <td class="sum venue-shishka">${formatSum(s.pay)}</td>
-        <td>${formatSum(t.fines + s.fines)}</td>
+        <td>${c.morning}</td>
+        <td>${c.eveningWeekday}</td>
+        <td>${c.eveningWeekend}</td>
+        <td>${c.intern}</td>
+        <td>${formatSum(Number(extra.fines || 0) + damageTotalIn(venue, emp.id))}</td>
       </tr>
     `;
   }).join("");
 
-  const lateFines = venueIds().flatMap((id) => people
-    .map((emp) => ({
-      name: emp.name,
-      place: venueShort(id),
-      sum: Number(extrasForVenue(venueState(id), emp.id).fines || 0),
-    }))
-    .filter((row) => row.sum > 0));
-  const damages = venueIds().flatMap((id) => (venueState(id).fines || [])
+  const lateFines = people
+    .map((emp) => ({ name: emp.name, sum: Number(extrasForVenue(venue, emp.id).fines || 0) }))
+    .filter((row) => row.sum > 0);
+  const damages = (venue.fines || [])
     .filter((f) => inCurrentPeriod(f.date))
-    .map((f) => ({ ...f, place: venueShort(id) })))
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   const lateTotal = lateFines.reduce((sum, row) => sum + row.sum, 0);
   const damageSum = damages.reduce((sum, f) => sum + Number(f.sum || 0), 0);
-  const ratesLine = venueIds().map((id) => {
-    const rates = venueState(id).rates || DEFAULT_RATES;
-    return `${venueShort(id)}: утро ${formatSum(rates.morning)} · будни ${formatSum(rates.eveningWeekday)} · пт–вс ${formatSum(rates.eveningWeekend)} · стаж ${formatSum(rates.intern)}`;
-  }).join("<br>");
+  const rates = venue.rates || DEFAULT_RATES;
   const lateTable = lateFines.length
     ? `<section class="report-fines">
         <h2>Штрафы</h2>
         <table class="pay report-table">
           <thead><tr><th class="name">Сотрудник</th><th>Штраф</th></tr></thead>
           <tbody>
-            ${lateFines.map((row) => `<tr><th class="name">${escapeHtml(row.name)} · ${escapeHtml(row.place)}</th><td class="sum">${formatSum(row.sum)}</td></tr>`).join("")}
+            ${lateFines.map((row) => `<tr><th class="name">${escapeHtml(row.name)}</th><td class="sum">${formatSum(row.sum)}</td></tr>`).join("")}
             <tr><th class="name">Итого</th><td class="sum">${formatSum(lateTotal)}</td></tr>
           </tbody>
         </table>
@@ -1651,7 +1642,7 @@ function timesheetReportHtml() {
               const emp = employeeById(f.empId);
               return `<tr>
                 <td>${parseISODate(f.date).toLocaleDateString("ru-RU")}</td>
-                <th class="name">${escapeHtml(emp?.name || "Сотрудник")} · ${escapeHtml(f.place)}</th>
+                <th class="name">${escapeHtml(emp?.name || "Сотрудник")}</th>
                 <th class="name">${escapeHtml(f.what)}</th>
                 <td>${f.qty}</td>
                 <td class="sum">${formatSum(f.sum)}</td>
@@ -1665,23 +1656,28 @@ function timesheetReportHtml() {
 
   return `
     <header class="report-head">
-      <h1>Табель · ${reportPeriodLabel()}</h1>
-      <p class="report-rates">${ratesLine}</p>
+      <h1>${escapeHtml(venueShort(venueId))} · ${escapeHtml(VENUES[venueId])} · ${reportPeriodLabel()}</h1>
+      <p class="report-rates">
+        Утро ${formatSum(rates.morning)} ·
+        будни ${formatSum(rates.eveningWeekday)} ·
+        пт–вс ${formatSum(rates.eveningWeekend)} ·
+        стаж ${formatSum(rates.intern)}
+      </p>
     </header>
     <div class="excel-card report-roster">
-      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(0,7.6em) repeat(${days.length * 2},minmax(0,1fr));width:100%;min-width:0">
+      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(0,7.6em) repeat(${days.length},minmax(0,1fr));width:100%;min-width:0">
         ${rosterCells}
       </div>
     </div>
     <div class="excel-card report-pay">
-      <table class="pay pay-split" style="--rows:${people.length + 1}">
+      <table class="pay" style="--rows:${people.length + 1}">
         <thead>
           <tr>
             <th class="name">Сотрудник</th>
-            <th>Танж смены</th>
-            <th>Танж ₽</th>
-            <th>Шишка смены</th>
-            <th>Шишка ₽</th>
+            <th>Утро</th>
+            <th>Будни вечер</th>
+            <th>Выходной вечер</th>
+            <th>Стаж</th>
             <th>Порча / штраф</th>
           </tr>
         </thead>
@@ -1702,7 +1698,7 @@ function timesheetReportHtml() {
 function renderReport() {
   const paper = $("#reportPaper");
   if (!paper) return;
-  paper.innerHTML = timesheetReportHtml();
+  paper.innerHTML = venueIds().map(timesheetReportHtml).join("");
   requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
 function syncReportOrientation() {
@@ -1890,9 +1886,9 @@ function cycleCell(btn) {
   else delete venue.schedule[iso][empId];
   save();
 
-  const date = parseISODate(iso);
-  btn.innerHTML = shiftCellHtml(next);
-  btn.className = `cell ${shiftClass(next, date)} venue-${btn.dataset.venue}`;
+  paintShiftButton(btn);
+  const otherBtn = document.querySelector(`.cell[data-emp="${empId}"][data-day="${iso}"][data-venue="${otherVenueId(btn.dataset.venue)}"]`);
+  if (otherBtn) paintShiftButton(otherBtn);
   renderPayFor(btn.dataset.venue);
 }
 
