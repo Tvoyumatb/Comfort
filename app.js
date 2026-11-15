@@ -1,4 +1,4 @@
-const APP_VERSION = "109";
+const APP_VERSION = "110";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1156,6 +1156,16 @@ function isWeekend(date) {
   return day === 0 || day === 5 || day === 6;
 }
 
+const WEEKDAYS_SHORT = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+
+function weekdayShort(date) {
+  return WEEKDAYS_SHORT[date.getDay()] || "";
+}
+
+function dayHeadHtml(date) {
+  return `<span class="day-num">${date.getDate()}</span><small class="dow">${weekdayShort(date)}</small>`;
+}
+
 function shiftType(type) {
   return type === "eveningWe" ? "evening" : (type || "");
 }
@@ -1540,7 +1550,7 @@ function rosterHtml(venueId) {
   const head = `
     <tr>
       <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
-      ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
+      ${days.map((d) => `<th>${dayHeadHtml(d)}</th>`).join("")}
     </tr>
   `;
   const body = people.map((emp) => `
@@ -1668,7 +1678,7 @@ function timesheetReportHtml(venueId) {
   const people = visibleEmployeesAll();
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
-    ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
+    ...days.map((d) => `<div class="rt-head rt-day">${dayHeadHtml(d)}</div>`),
     ...people.flatMap((emp) => [
       `<div class="rt-name">${nameHtml(emp.name)}</div>`,
       ...days.map((date) => `<div class="rt-shift ${cellClassName(venueId, emp.id, date)}">${cellContentHtml(venueId, emp.id, date)}</div>`),

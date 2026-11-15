@@ -1220,7 +1220,23 @@ body[data-venue="shishka"] .rates-open {
   background: #f3f3f3;
   font-weight: 700;
   min-width: 46px;
-  height: 36px;
+  height: 40px;
+}
+
+.roster th .day-num,
+.rt-day .day-num {
+  display: block;
+  line-height: 1.1;
+}
+
+.roster th .dow,
+.rt-day .dow {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #777;
+  text-transform: lowercase;
+  line-height: 1;
 }
 
 .roster .name, .pay .name {
@@ -1568,6 +1584,14 @@ body[data-venue="shishka"] .rates-open {
   text-align: center;
   padding: 5px 2px;
   line-height: 1.2;
+}
+
+.report-timesheet .rt-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
 }
 
 .report-timesheet .rt-name {
