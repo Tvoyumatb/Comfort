@@ -1143,21 +1143,49 @@ input[type="number"] {
   line-height: 1.2;
 }
 
-.day-split {
+.roster-legend {
   display: flex;
-  flex-direction: column;
-  padding: 0;
-  min-width: 54px;
-  vertical-align: stretch;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.day-split .cell {
-  min-height: 34px;
-  border-bottom: 1px solid #b4b4b4;
+.roster-legend .mark {
+  padding: 4px 8px;
+  border-radius: 8px;
 }
 
-.day-split .cell:last-child {
-  border-bottom: 0;
+.roster-legend .mark.venue-tangiers {
+  background: #ff6b35;
+  color: #fff;
+}
+
+.roster-legend .mark.venue-shishka {
+  background: #3d7ec9;
+  color: #fff;
+}
+
+.roster .day-head {
+  min-width: 88px;
+}
+
+.roster th.sub {
+  min-width: 44px;
+  height: 26px;
+  font-size: 10px;
+}
+
+.roster th.sub.venue-tangiers,
+.roster td.venue-tangiers {
+  background: #fff4ee;
+}
+
+.roster th.sub.venue-shishka,
+.roster td.venue-shishka {
+  background: #eef5ff;
 }
 
 .pay-split td.venue-tangiers,
@@ -1179,44 +1207,18 @@ input[type="number"] {
 
 .cell {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
   width: 100%;
-  min-height: 40px;
+  min-height: 42px;
   padding: 2px 0;
   border: 0;
-  background: #fff;
+  background: transparent;
   color: #888;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
-  line-height: 1.05;
 }
-
-.cell-place {
-  display: block;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.cell.venue-tangiers {
-  background: #fff4ee;
-}
-
-.cell.venue-shishka {
-  background: #eef5ff;
-}
-
-.cell.venue-tangiers .cell-place { color: #ff6b35; }
-.cell.venue-shishka .cell-place { color: #3d7ec9; }
-.cell.morning .cell-place,
-.cell.evening-wd .cell-place,
-.cell.evening-we .cell-place,
-.cell.intern .cell-place { color: inherit; }
 
 .cell.morning { background: #fff200; color: #111; }
 .cell.evening-wd { background: #c00000; color: #fff; }
@@ -1481,11 +1483,30 @@ input[type="number"] {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  grid-template-columns: minmax(110px, 8.4em) repeat(var(--days, 15), minmax(36px, 1fr));
+  grid-template-columns: minmax(110px, 8.4em) repeat(calc(var(--days, 15) * 2), minmax(22px, 1fr));
   background: #fff;
   border-top: 1px solid #b4b4b4;
   border-left: 1px solid #b4b4b4;
   font-size: 11px;
+}
+
+.report-timesheet .rt-day {
+  grid-column: span 2;
+}
+
+.report-timesheet .rt-sub {
+  font-size: 8px;
+  padding: 2px 1px;
+}
+
+.report-timesheet .rt-sub.venue-tangiers,
+.report-timesheet .rt-shift.venue-tangiers:not(.morning):not(.evening-wd):not(.evening-we):not(.intern) {
+  background: #fff4ee;
+}
+
+.report-timesheet .rt-sub.venue-shishka,
+.report-timesheet .rt-shift.venue-shishka:not(.morning):not(.evening-wd):not(.evening-we):not(.intern) {
+  background: #eef5ff;
 }
 
 .report-timesheet > * {
@@ -1522,15 +1543,6 @@ input[type="number"] {
   word-break: break-word;
 }
 
-.report-paper .day-split {
-  min-width: 0;
-  min-height: 36px;
-}
-
-.report-paper .day-split .cell {
-  min-height: 18px;
-  font-size: 9px;
-}
 
 .report-timesheet .rt-head.rt-name {
   background: #f3f3f3;
@@ -1540,14 +1552,13 @@ input[type="number"] {
 
 .report-timesheet .rt-shift {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: stretch;
-  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
   height: 100%;
   width: auto;
   max-width: none;
-  padding: 0;
+  padding: 3px 1px;
   font-size: 10px;
   white-space: nowrap;
   cursor: default;

@@ -1,4 +1,4 @@
-const APP_VERSION = "105";
+const APP_VERSION = "106";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -952,14 +952,7 @@ function venueShiftButton(venueId, empId, date) {
   const iso = toISODate(date);
   const type = shiftType(venueState(venueId).schedule?.[iso]?.[empId] || "");
   const cls = shiftClass(type, date);
-  return `<button type="button" class="cell ${cls} venue-${venueId}" data-emp="${empId}" data-day="${iso}" data-venue="${venueId}">
-    <small class="cell-place">${escapeHtml(venueShort(venueId))}</small>
-    <span>${shiftCellHtml(type)}</span>
-  </button>`;
-}
-
-function daySplitHtml(emp, date) {
-  return `<td class="day-split">${venueIds().map((id) => venueShiftButton(id, emp.id, date)).join("")}</td>`;
+  return `<td class="venue-col venue-${venueId}"><button type="button" class="cell ${cls} venue-${venueId}" data-emp="${empId}" data-day="${iso}" data-venue="${venueId}">${shiftCellHtml(type)}</button></td>`;
 }
 
 function setVenue(id) {
@@ -1422,8 +1415,11 @@ function rosterHtml() {
   const people = visibleEmployeesAll();
   const head = `
     <tr>
-      <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
-      ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
+      <th class="name" rowspan="2">${MONTHS_RU[viewMonth.getMonth()]}</th>
+      ${days.map((d) => `<th class="day-head" colspan="2">${d.getDate()}</th>`).join("")}
+    </tr>
+    <tr>
+      ${days.map(() => venueIds().map((id) => `<th class="sub venue-${id}">${escapeHtml(venueShort(id))}</th>`).join("")).join("")}
     </tr>
   `;
   const body = people.map((emp) => `
@@ -1432,10 +1428,16 @@ function rosterHtml() {
         ${escapeHtml(emp.name)}
         <button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>
       </th>
-      ${days.map((date) => daySplitHtml(emp, date)).join("")}
+      ${days.map((date) => venueIds().map((id) => venueShiftButton(id, emp.id, date)).join("")).join("")}
     </tr>
   `).join("");
-  return `<table class="roster"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  return `
+    <p class="roster-legend">
+      <span class="mark venue-tangiers">оранжевая колонка — Танж</span>
+      <span class="mark venue-shishka">синяя колонка — Шишка</span>
+    </p>
+    <table class="roster roster-duo"><thead>${head}</thead><tbody>${body}</tbody></table>
+  `;
 }
 
 function allRatesHtml() {
@@ -1574,13 +1576,15 @@ function timesheetReportHtml() {
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
+    `<div class="rt-head rt-name"></div>`,
+    ...days.flatMap(() => venueIds().map((id) => `<div class="rt-head rt-sub venue-${id}">${escapeHtml(venueShort(id))}</div>`)),
     ...people.flatMap((emp) => [
       `<div class="rt-name">${nameHtml(emp.name)}</div>`,
-      ...days.map((date) => `<div class="rt-shift day-split">${venueIds().map((id) => {
+      ...days.flatMap((date) => venueIds().map((id) => {
         const type = shiftType(venueState(id).schedule?.[toISODate(date)]?.[emp.id] || "");
         const cls = shiftClass(type, date);
-        return `<div class="cell ${cls} venue-${id}"><small class="cell-place">${escapeHtml(venueShort(id))}</small><span>${shiftCellHtml(type)}</span></div>`;
-      }).join("")}</div>`),
+        return `<div class="rt-shift cell ${cls} venue-${id}">${shiftCellHtml(type)}</div>`;
+      })),
     ]),
   ].join("");
 
@@ -1665,7 +1669,7 @@ function timesheetReportHtml() {
       <p class="report-rates">${ratesLine}</p>
     </header>
     <div class="excel-card report-roster">
-      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(0,7.6em) repeat(${days.length},minmax(0,1fr));width:100%;min-width:0">
+      <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(0,7.6em) repeat(${days.length * 2},minmax(0,1fr));width:100%;min-width:0">
         ${rosterCells}
       </div>
     </div>
@@ -1887,7 +1891,7 @@ function cycleCell(btn) {
   save();
 
   const date = parseISODate(iso);
-  btn.innerHTML = `<small class="cell-place">${escapeHtml(venueShort(btn.dataset.venue))}</small><span>${shiftCellHtml(next)}</span>`;
+  btn.innerHTML = shiftCellHtml(next);
   btn.className = `cell ${shiftClass(next, date)} venue-${btn.dataset.venue}`;
   renderPayFor(btn.dataset.venue);
 }
