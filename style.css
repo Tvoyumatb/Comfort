@@ -225,6 +225,36 @@ body[data-tab="shifts"] .venues {
 
 .timesheet-venue {
   margin: 0 0 22px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.timesheet-venue.venue-tangiers {
+  border-color: #ff6b35;
+  background: color-mix(in srgb, #ff6b35 10%, transparent);
+}
+
+.timesheet-venue.venue-shishka {
+  border-color: #7ab8ff;
+  background: color-mix(in srgb, #7ab8ff 10%, transparent);
+}
+
+.timesheet-place {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 16px;
+}
+
+.timesheet-venue.venue-tangiers .timesheet-place {
+  background: #ff6b35;
+  color: #fff;
+}
+
+.timesheet-venue.venue-shishka .timesheet-place {
+  background: #3d7ec9;
+  color: #fff;
 }
 
 .timesheet-venue .block-title {
@@ -1130,15 +1160,38 @@ input[type="number"] {
 }
 
 .cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
   width: 100%;
-  min-height: 40px;
+  min-height: 44px;
+  padding: 2px 0;
   border: 0;
   background: #fff;
   color: #888;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  line-height: 1.1;
 }
+
+.cell-place {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.cell.venue-tangiers .cell-place { color: #ff6b35; }
+.cell.venue-shishka .cell-place { color: #3d7ec9; }
+.cell.morning .cell-place,
+.cell.evening-wd .cell-place,
+.cell.evening-we .cell-place,
+.cell.intern .cell-place { color: inherit; opacity: 0.9; }
 
 .cell.morning { background: #fff200; color: #111; }
 .cell.evening-wd { background: #c00000; color: #fff; }

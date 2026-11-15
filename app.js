@@ -1,4 +1,4 @@
-const APP_VERSION = "102";
+const APP_VERSION = "103";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -12,6 +12,11 @@ const MQTT_BROKERS = [
 const VENUES = {
   tangiers: "Tangiers",
   shishka: "Shishka Premium",
+};
+
+const VENUE_SHORT = {
+  tangiers: "Танж",
+  shishka: "Шишка",
 };
 
 const DEFAULT_GRAMS_PER_HOOKAH = 25;
@@ -931,6 +936,15 @@ function venueName() {
   return VENUES[db.current];
 }
 
+function venueShort(id) {
+  return VENUE_SHORT[id] || VENUES[id] || id;
+}
+
+function shiftCellHtml(venueId, type) {
+  const label = SHIFT_LABEL[type] || "/";
+  return `<small class="cell-place">${escapeHtml(venueShort(venueId))}</small><span>${escapeHtml(label)}</span>`;
+}
+
 function setVenue(id) {
   if (!VENUES[id]) return;
   db.current = id;
@@ -1399,7 +1413,7 @@ function rosterHtml(venue, venueId) {
         const iso = toISODate(date);
         const type = shiftType(venue.schedule?.[iso]?.[emp.id] || "");
         const cls = shiftClass(type, date);
-        return `<td><button type="button" class="cell ${cls}" data-emp="${emp.id}" data-day="${iso}" data-venue="${venueId}">${SHIFT_LABEL[type]}</button></td>`;
+        return `<td><button type="button" class="cell ${cls} venue-${venueId}" data-emp="${emp.id}" data-day="${iso}" data-venue="${venueId}">${shiftCellHtml(venueId, type)}</button></td>`;
       }).join("")}
     </tr>
   `).join("");
@@ -1492,13 +1506,13 @@ function renderShifts() {
     box.innerHTML = Object.keys(VENUES).map((id) => {
       const venue = venueState(id);
       return `
-        <section class="timesheet-venue" data-timesheet="${id}">
-          <h2 class="block-title">${escapeHtml(VENUES[id])}</h2>
+        <section class="timesheet-venue venue-${id}" data-timesheet="${id}">
+          <h2 class="block-title timesheet-place">${escapeHtml(venueShort(id))} · ${escapeHtml(VENUES[id])}</h2>
           <div class="rates">${ratesHtml(venue, id)}</div>
           <div class="excel-card">
             <div class="roster-wrap">${rosterHtml(venue, id)}</div>
           </div>
-          <h2 class="block-title">Расчёт · ${escapeHtml(VENUES[id])}</h2>
+          <h2 class="block-title">Расчёт · ${escapeHtml(venueShort(id))}</h2>
           <div class="excel-card pay-wrap" data-pay="${id}">${payHtml(venue, id)}</div>
         </section>
       `;
@@ -1526,7 +1540,7 @@ function timesheetReportHtml(venueId) {
       ...days.map((date) => {
         const type = shiftType(venue.schedule?.[toISODate(date)]?.[emp.id] || "");
         const cls = shiftClass(type, date);
-        return `<div class="rt-shift cell ${cls}">${SHIFT_LABEL[type]}</div>`;
+        return `<div class="rt-shift cell ${cls} venue-${venueId}">${shiftCellHtml(venueId, type)}</div>`;
       }),
     ]),
   ].join("");
@@ -1599,7 +1613,7 @@ function timesheetReportHtml(venueId) {
 
   return `
     <header class="report-head">
-      <h1>${escapeHtml(VENUES[venueId])} · ${reportPeriodLabel()}</h1>
+      <h1>${escapeHtml(venueShort(venueId))} · ${escapeHtml(VENUES[venueId])} · ${reportPeriodLabel()}</h1>
       <p class="report-rates">
         Утро ${formatSum(rates.morning)} ·
         будни ${formatSum(rates.eveningWeekday)} ·
@@ -1830,8 +1844,8 @@ function cycleCell(btn) {
   save();
 
   const date = parseISODate(iso);
-  btn.textContent = SHIFT_LABEL[next];
-  btn.className = `cell ${shiftClass(next, date)}`;
+  btn.innerHTML = shiftCellHtml(btn.dataset.venue, next);
+  btn.className = `cell ${shiftClass(next, date)} venue-${btn.dataset.venue}`;
   renderPayFor(btn.dataset.venue);
 }
 
