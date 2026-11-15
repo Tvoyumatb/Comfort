@@ -1,4 +1,4 @@
-const APP_VERSION = "107";
+const APP_VERSION = "108";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1006,8 +1006,7 @@ function activeTabId() {
 function syncVenueUi() {
   document.body.dataset.venue = db.current;
   document.body.dataset.tab = activeTabId();
-  const onShifts = activeTabId() === "shifts";
-  $("#venueEyebrow").textContent = onShifts ? "Оба филиала" : venueName();
+  $("#venueEyebrow").textContent = venueName();
   $$(".venue").forEach((btn) => {
     btn.classList.toggle("is-active", btn.dataset.venue === db.current);
   });
@@ -1550,20 +1549,16 @@ function renderShifts() {
   renderPeriod();
   const box = $("#timesheetVenues");
   if (box) {
-    box.innerHTML = venueIds().map((id) => {
-      const venue = venueState(id);
-      return `
-        <section class="timesheet-venue venue-${id}" data-timesheet="${id}">
-          <h2 class="block-title timesheet-place">${escapeHtml(venueShort(id))} · ${escapeHtml(VENUES[id])}</h2>
-          <div class="rates">${ratesHtml(venue, id)}</div>
-          <div class="excel-card">
-            <div class="roster-wrap">${rosterHtml(id)}</div>
-          </div>
-          <h2 class="block-title">Расчёт · ${escapeHtml(venueShort(id))}</h2>
-          <div class="excel-card pay-wrap" data-pay="${id}">${payHtml(venue, id)}</div>
-        </section>
-      `;
-    }).join("");
+    const id = db.current;
+    const venue = venueState(id);
+    box.innerHTML = `
+      <div class="rates">${ratesHtml(venue, id)}</div>
+      <div class="excel-card">
+        <div class="roster-wrap">${rosterHtml(id)}</div>
+      </div>
+      <h2 class="block-title">Расчёт</h2>
+      <div class="excel-card pay-wrap" data-pay="${id}">${payHtml(venue, id)}</div>
+    `;
   }
   renderFines();
   if (!$("#reportView")?.hidden) refreshOpenReport();
@@ -1698,7 +1693,7 @@ function timesheetReportHtml(venueId) {
 function renderReport() {
   const paper = $("#reportPaper");
   if (!paper) return;
-  paper.innerHTML = venueIds().map(timesheetReportHtml).join("");
+  paper.innerHTML = timesheetReportHtml(db.current);
   requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
 function syncReportOrientation() {

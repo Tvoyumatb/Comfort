@@ -219,10 +219,6 @@ h1 {
   padding: 0 var(--pad) 8px;
 }
 
-body[data-tab="shifts"] .venues {
-  display: none;
-}
-
 .timesheet-venue {
   margin: 0 0 22px;
   padding: 8px;
