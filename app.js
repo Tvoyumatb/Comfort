@@ -1,4 +1,4 @@
-const APP_VERSION = "104";
+const APP_VERSION = "105";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -948,6 +948,20 @@ function shiftCellHtml(type) {
   return escapeHtml(SHIFT_LABEL[type] || "/");
 }
 
+function venueShiftButton(venueId, empId, date) {
+  const iso = toISODate(date);
+  const type = shiftType(venueState(venueId).schedule?.[iso]?.[empId] || "");
+  const cls = shiftClass(type, date);
+  return `<button type="button" class="cell ${cls} venue-${venueId}" data-emp="${empId}" data-day="${iso}" data-venue="${venueId}">
+    <small class="cell-place">${escapeHtml(venueShort(venueId))}</small>
+    <span>${shiftCellHtml(type)}</span>
+  </button>`;
+}
+
+function daySplitHtml(emp, date) {
+  return `<td class="day-split">${venueIds().map((id) => venueShiftButton(id, emp.id, date)).join("")}</td>`;
+}
+
 function setVenue(id) {
   if (!VENUES[id]) return;
   db.current = id;
@@ -1412,24 +1426,16 @@ function rosterHtml() {
       ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
     </tr>
   `;
-  const body = people.map((emp) => venueIds().map((id, i) => {
-    const venue = venueState(id);
-    return `
-    <tr class="venue-${id}${i === 0 ? " emp-first" : ""}">
+  const body = people.map((emp) => `
+    <tr>
       <th class="name">
-        <span class="emp-line">${escapeHtml(emp.name)}</span>
-        <span class="cell-place">${escapeHtml(venueShort(id))}</span>
-        ${i === 0 ? `<button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>` : ""}
+        ${escapeHtml(emp.name)}
+        <button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>
       </th>
-      ${days.map((date) => {
-        const iso = toISODate(date);
-        const type = shiftType(venue.schedule?.[iso]?.[emp.id] || "");
-        const cls = shiftClass(type, date);
-        return `<td><button type="button" class="cell ${cls} venue-${id}" data-emp="${emp.id}" data-day="${iso}" data-venue="${id}">${shiftCellHtml(type)}</button></td>`;
-      }).join("")}
-    </tr>`;
-  }).join("")).join("");
-  return `<table class="roster roster-split"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+      ${days.map((date) => daySplitHtml(emp, date)).join("")}
+    </tr>
+  `).join("");
+  return `<table class="roster"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
 function allRatesHtml() {
@@ -1568,14 +1574,14 @@ function timesheetReportHtml() {
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
-    ...people.flatMap((emp) => venueIds().flatMap((id, i) => [
-      `<div class="rt-name venue-${id}">${i === 0 ? nameHtml(emp.name) : ""}<small class="cell-place">${escapeHtml(venueShort(id))}</small></div>`,
-      ...days.map((date) => {
+    ...people.flatMap((emp) => [
+      `<div class="rt-name">${nameHtml(emp.name)}</div>`,
+      ...days.map((date) => `<div class="rt-shift day-split">${venueIds().map((id) => {
         const type = shiftType(venueState(id).schedule?.[toISODate(date)]?.[emp.id] || "");
         const cls = shiftClass(type, date);
-        return `<div class="rt-shift cell ${cls} venue-${id}">${shiftCellHtml(type)}</div>`;
-      }),
-    ])),
+        return `<div class="cell ${cls} venue-${id}"><small class="cell-place">${escapeHtml(venueShort(id))}</small><span>${shiftCellHtml(type)}</span></div>`;
+      }).join("")}</div>`),
+    ]),
   ].join("");
 
   const payRows = people.map((emp) => {
@@ -1881,7 +1887,7 @@ function cycleCell(btn) {
   save();
 
   const date = parseISODate(iso);
-  btn.innerHTML = shiftCellHtml(next);
+  btn.innerHTML = `<small class="cell-place">${escapeHtml(venueShort(btn.dataset.venue))}</small><span>${shiftCellHtml(next)}</span>`;
   btn.className = `cell ${shiftClass(next, date)} venue-${btn.dataset.venue}`;
   renderPayFor(btn.dataset.venue);
 }
