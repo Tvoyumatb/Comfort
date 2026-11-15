@@ -1,4 +1,4 @@
-const APP_VERSION = "112";
+const APP_VERSION = "113";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1137,23 +1137,27 @@ function elsewhereMark(venueId, empId, iso) {
   return type ? { other, type } : null;
 }
 
-function cellContentHtml(venueId, empId, date) {
+function cellContentHtml(venueId, empId, date, showOther = true) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
   if (type) return shiftCellHtml(type, venueId);
-  const away = elsewhereMark(venueId, empId, iso);
-  if (away) {
-    return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${shiftCellHtml(away.type, away.other)}</span>`;
+  if (showOther) {
+    const away = elsewhereMark(venueId, empId, iso);
+    if (away) {
+      return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${shiftCellHtml(away.type, away.other)}</span>`;
+    }
   }
   return shiftCellHtml("", venueId);
 }
 
-function cellClassName(venueId, empId, date) {
+function cellClassName(venueId, empId, date, showOther = true) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
   if (type) return `cell ${shiftClass(type, date)}`;
-  const away = elsewhereMark(venueId, empId, iso);
-  if (away) return `cell elsewhere venue-${away.other}`;
+  if (showOther) {
+    const away = elsewhereMark(venueId, empId, iso);
+    if (away) return `cell elsewhere venue-${away.other}`;
+  }
   return "cell";
 }
 
@@ -1812,13 +1816,13 @@ function timesheetReportHtml(venueId) {
   const venue = venueState(venueId);
   const days = periodDays();
   const nameHtml = (text) => escapeHtml(text).replace(" ", "<br>");
-  const people = visibleEmployeesAll();
+  const people = visibleEmployeesIn(venue);
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${dayHeadHtml(d)}</div>`),
     ...people.flatMap((emp) => [
       `<div class="rt-name">${nameHtml(emp.name)}</div>`,
-      ...days.map((date) => `<div class="rt-shift ${cellClassName(venueId, emp.id, date)}">${cellContentHtml(venueId, emp.id, date)}</div>`),
+      ...days.map((date) => `<div class="rt-shift ${cellClassName(venueId, emp.id, date, false)}">${cellContentHtml(venueId, emp.id, date, false)}</div>`),
     ]),
   ].join("");
 
