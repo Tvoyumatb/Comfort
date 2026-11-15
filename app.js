@@ -1,4 +1,4 @@
-const APP_VERSION = "108";
+const APP_VERSION = "109";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -129,6 +129,26 @@ const DEFAULT_RATES = {
   intern: 100000,
 };
 
+const DEFAULT_RATE_NAMES = {
+  morning: "Утро с 11:30",
+  eveningWeekday: "Вечер будни пн–чт с 18:00",
+  eveningWeekend: "Вечер выходные пт–вс",
+  intern: "Стажировка",
+};
+
+const DEFAULT_SHIFT_NAMES = {
+  morning: "Утро",
+  evening: "Вечер",
+  intern: "Стаж",
+};
+
+const RATE_FIELDS = [
+  { key: "morning", cls: "morning", shift: "morning" },
+  { key: "eveningWeekday", cls: "evening-wd", shift: "evening" },
+  { key: "eveningWeekend", cls: "evening-we", shift: "evening" },
+  { key: "intern", cls: "intern", shift: "intern" },
+];
+
 const MONTHS_RU = [
   "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
   "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
@@ -227,6 +247,8 @@ function emptyState(venueId = "tangiers") {
     schedule: {},
     extras: {},
     rates: { ...DEFAULT_RATES },
+    rateNames: { ...DEFAULT_RATE_NAMES },
+    shiftNames: { ...DEFAULT_SHIFT_NAMES },
     tobacco: [],
     revisions: [],
     checklist: defaultChecklist(venueId),
@@ -510,6 +532,8 @@ function normalizeVenue(data, venueId) {
     schedule: data.schedule || {},
     extras: data.extras || {},
     rates: { ...DEFAULT_RATES, ...(data.rates || {}) },
+    rateNames: { ...DEFAULT_RATE_NAMES, ...(data.rateNames || {}) },
+    shiftNames: { ...DEFAULT_SHIFT_NAMES, ...(data.shiftNames || {}) },
     tobacco: data.tobacco || [],
     revisions: data.revisions || [],
     inventoryStock: data.inventoryStock?.length ? data.inventoryStock : base.inventoryStock,
@@ -952,8 +976,22 @@ function shiftOn(venueId, empId, iso) {
   return shiftType(venueState(venueId).schedule?.[iso]?.[empId] || "");
 }
 
-function shiftCellHtml(type) {
-  return escapeHtml(SHIFT_LABEL[type] || "/");
+function venueRates(venue) {
+  return { ...DEFAULT_RATES, ...(venue?.rates || {}) };
+}
+
+function rateTitle(venue, key) {
+  return String(venue?.rateNames?.[key] || DEFAULT_RATE_NAMES[key] || key);
+}
+
+function shiftTitle(venueId, type) {
+  if (!type) return "/";
+  const names = venueState(venueId).shiftNames || DEFAULT_SHIFT_NAMES;
+  return names[type] || SHIFT_LABEL[type] || type;
+}
+
+function shiftCellHtml(type, venueId = db.current) {
+  return escapeHtml(shiftTitle(venueId, type));
 }
 
 function elsewhereMark(venueId, empId, iso) {
@@ -965,12 +1003,12 @@ function elsewhereMark(venueId, empId, iso) {
 function cellContentHtml(venueId, empId, date) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
-  if (type) return shiftCellHtml(type);
+  if (type) return shiftCellHtml(type, venueId);
   const away = elsewhereMark(venueId, empId, iso);
   if (away) {
-    return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${escapeHtml(SHIFT_LABEL[away.type])}</span>`;
+    return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${shiftCellHtml(away.type, away.other)}</span>`;
   }
-  return shiftCellHtml("");
+  return shiftCellHtml("", venueId);
 }
 
 function cellClassName(venueId, empId, date) {
@@ -1364,7 +1402,7 @@ function countShifts(empId) {
 function payoutIn(venue, empId) {
   const c = countShiftsIn(venue, empId);
   const extra = extrasForVenue(venue, empId);
-  const rates = venue.rates || DEFAULT_RATES;
+  const rates = venueRates(venue);
   return (
     c.morning * rates.morning +
     c.eveningWeekday * rates.eveningWeekday +
@@ -1389,22 +1427,76 @@ function renderPeriod() {
     : `${venueName()} · ${MONTHS_RU[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`;
 }
 
-function ratesHtml(venue, venueId) {
-  const rates = venue.rates || DEFAULT_RATES;
+function ratesHtml(venue) {
+  const rates = venueRates(venue);
+  const line = RATE_FIELDS.map((row) => `${rateTitle(venue, row.key)} ${formatSum(rates[row.key])}`).join(" · ");
   return `
-    <label class="rate morning">Утро с 11:30
-      <input type="number" min="0" step="1000" data-rate="morning" data-venue="${venueId}" value="${rates.morning}">
-    </label>
-    <label class="rate evening-wd">Вечер будни пн–чт с 18:00
-      <input type="number" min="0" step="1000" data-rate="eveningWeekday" data-venue="${venueId}" value="${rates.eveningWeekday}">
-    </label>
-    <label class="rate evening-we">Вечер выходные пт–вс
-      <input type="number" min="0" step="1000" data-rate="eveningWeekend" data-venue="${venueId}" value="${rates.eveningWeekend}">
-    </label>
-    <label class="rate intern">Стажировка
-      <input type="number" min="0" step="1000" data-rate="intern" data-venue="${venueId}" value="${rates.intern}">
-    </label>
+    <button type="button" class="rates-open" data-open-rates>
+      <strong>Ставки смен</strong>
+      <span>${escapeHtml(line)}</span>
+    </button>
   `;
+}
+
+function fillRatesModal() {
+  const venue = venueState(db.current);
+  const rates = venueRates(venue);
+  const shiftNames = { ...DEFAULT_SHIFT_NAMES, ...(venue.shiftNames || {}) };
+  const nameBox = $("#ratesVenueName");
+  if (nameBox) nameBox.textContent = venueName();
+  const shorts = $("#ratesShorts");
+  if (shorts) {
+    shorts.innerHTML = Object.keys(DEFAULT_SHIFT_NAMES).map((key) => `
+      <label>В клетке · ${escapeHtml(SHIFT_LABEL[key] || key)}
+        <input type="text" data-shift-name="${key}" value="${escapeHtml(shiftNames[key] || "")}" maxlength="16">
+      </label>
+    `).join("");
+  }
+  const list = $("#ratesFields");
+  if (list) {
+    list.innerHTML = RATE_FIELDS.map((row) => `
+      <div class="rate-edit ${row.cls}">
+        <label>Название
+          <input type="text" data-rate-name="${row.key}" value="${escapeHtml(rateTitle(venue, row.key))}" maxlength="48">
+        </label>
+        <label>Сумма
+          <input type="number" min="0" step="1000" data-rate="${row.key}" value="${rates[row.key]}">
+        </label>
+      </div>
+    `).join("");
+  }
+}
+
+function openRatesModal() {
+  fillRatesModal();
+  const modal = $("#ratesModal");
+  if (modal) modal.hidden = false;
+}
+
+function closeRatesModal() {
+  const modal = $("#ratesModal");
+  if (modal) modal.hidden = true;
+}
+
+function saveRatesModal() {
+  const venue = venueState(db.current);
+  if (!venue.rates) venue.rates = { ...DEFAULT_RATES };
+  if (!venue.rateNames) venue.rateNames = { ...DEFAULT_RATE_NAMES };
+  if (!venue.shiftNames) venue.shiftNames = { ...DEFAULT_SHIFT_NAMES };
+  $$("#ratesModal [data-rate]").forEach((input) => {
+    venue.rates[input.dataset.rate] = Number(input.value || 0);
+  });
+  $$("#ratesModal [data-rate-name]").forEach((input) => {
+    const value = input.value.trim();
+    venue.rateNames[input.dataset.rateName] = value || DEFAULT_RATE_NAMES[input.dataset.rateName];
+  });
+  $$("#ratesModal [data-shift-name]").forEach((input) => {
+    const value = input.value.trim();
+    venue.shiftNames[input.dataset.shiftName] = value || DEFAULT_SHIFT_NAMES[input.dataset.shiftName];
+  });
+  save();
+  closeRatesModal();
+  renderShifts();
 }
 
 function employeeById(id) {
@@ -1487,10 +1579,10 @@ function payHtml(venue, venueId) {
       <thead>
         <tr>
           <th class="name">Сотрудник</th>
-          <th>Утро</th>
-          <th>Вечер будние</th>
-          <th>Вечер выходные</th>
-          <th>Стажировка</th>
+          <th>${escapeHtml(rateTitle(venue, "morning"))}</th>
+          <th>${escapeHtml(rateTitle(venue, "eveningWeekday"))}</th>
+          <th>${escapeHtml(rateTitle(venue, "eveningWeekend"))}</th>
+          <th>${escapeHtml(rateTitle(venue, "intern"))}</th>
           <th>Порча / штраф</th>
           <th>К выплате</th>
         </tr>
@@ -1552,7 +1644,7 @@ function renderShifts() {
     const id = db.current;
     const venue = venueState(id);
     box.innerHTML = `
-      <div class="rates">${ratesHtml(venue, id)}</div>
+      <div class="rates">${ratesHtml(venue)}</div>
       <div class="excel-card">
         <div class="roster-wrap">${rosterHtml(id)}</div>
       </div>
@@ -1606,7 +1698,7 @@ function timesheetReportHtml(venueId) {
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   const lateTotal = lateFines.reduce((sum, row) => sum + row.sum, 0);
   const damageSum = damages.reduce((sum, f) => sum + Number(f.sum || 0), 0);
-  const rates = venue.rates || DEFAULT_RATES;
+  const rates = venueRates(venue);
   const lateTable = lateFines.length
     ? `<section class="report-fines">
         <h2>Штрафы</h2>
@@ -1653,10 +1745,10 @@ function timesheetReportHtml(venueId) {
     <header class="report-head">
       <h1>${escapeHtml(venueShort(venueId))} · ${escapeHtml(VENUES[venueId])} · ${reportPeriodLabel()}</h1>
       <p class="report-rates">
-        Утро ${formatSum(rates.morning)} ·
-        будни ${formatSum(rates.eveningWeekday)} ·
-        пт–вс ${formatSum(rates.eveningWeekend)} ·
-        стаж ${formatSum(rates.intern)}
+        ${escapeHtml(rateTitle(venue, "morning"))} ${formatSum(rates.morning)} ·
+        ${escapeHtml(rateTitle(venue, "eveningWeekday"))} ${formatSum(rates.eveningWeekday)} ·
+        ${escapeHtml(rateTitle(venue, "eveningWeekend"))} ${formatSum(rates.eveningWeekend)} ·
+        ${escapeHtml(rateTitle(venue, "intern"))} ${formatSum(rates.intern)}
       </p>
     </header>
     <div class="excel-card report-roster">
@@ -1669,10 +1761,10 @@ function timesheetReportHtml(venueId) {
         <thead>
           <tr>
             <th class="name">Сотрудник</th>
-            <th>Утро</th>
-            <th>Будни вечер</th>
-            <th>Выходной вечер</th>
-            <th>Стаж</th>
+            <th>${escapeHtml(rateTitle(venue, "morning"))}</th>
+            <th>${escapeHtml(rateTitle(venue, "eveningWeekday"))}</th>
+            <th>${escapeHtml(rateTitle(venue, "eveningWeekend"))}</th>
+            <th>${escapeHtml(rateTitle(venue, "intern"))}</th>
             <th>Порча / штраф</th>
           </tr>
         </thead>
@@ -3151,6 +3243,10 @@ $("#nextPeriod").addEventListener("click", () => {
 });
 
 $("#timesheetVenues")?.addEventListener("click", (e) => {
+  if (e.target.closest("[data-open-rates]")) {
+    openRatesModal();
+    return;
+  }
   const cell = e.target.closest(".cell");
   if (cell) cycleCell(cell);
   const del = e.target.closest("[data-del-emp]");
@@ -3168,15 +3264,10 @@ $("#timesheetVenues")?.addEventListener("click", (e) => {
   }
 });
 
-$("#timesheetVenues")?.addEventListener("input", (e) => {
-  const key = e.target.dataset.rate;
-  const venueId = e.target.dataset.venue;
-  if (!key || !venueId) return;
-  const venue = venueState(venueId);
-  if (!venue.rates) venue.rates = { ...DEFAULT_RATES };
-  venue.rates[key] = Number(e.target.value || 0);
-  save();
-  renderPay();
+$("#ratesCancel")?.addEventListener("click", closeRatesModal);
+$("#ratesSave")?.addEventListener("click", saveRatesModal);
+$("#ratesModal")?.addEventListener("click", (e) => {
+  if (e.target.id === "ratesModal") closeRatesModal();
 });
 
 $("#fineForm").addEventListener("submit", (e) => {

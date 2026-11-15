@@ -1050,32 +1050,118 @@ input[type="number"] {
 }
 
 .rates {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
   margin-bottom: 12px;
 }
 
-.rate {
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #111;
+.rates-open {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
 }
 
-.rate.morning { background: #fff200; color: #111; }
-.rate.evening-wd { background: #c00000; color: #fff; }
-.rate.evening-we { background: #0070c0; color: #fff; }
-.rate.intern { background: #c65911; color: #fff; }
+.rates-open strong {
+  display: block;
+  font-size: 15px;
+}
 
-.rate input {
+.rates-open span {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+body[data-venue="tangiers"] .rates-open {
+  border-color: #ff6b35;
+}
+
+body[data-venue="shishka"] .rates-open {
+  border-color: #7ab8ff;
+}
+
+.rates-modal {
+  place-items: center;
+  overflow: auto;
+}
+
+.rates-card {
+  max-height: min(88vh, 720px);
+  overflow: auto;
+}
+
+.rates-card h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.rates-shorts,
+.rates-fields {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.rates-shorts {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.rates-shorts label,
+.rate-edit label {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rates-shorts input,
+.rate-edit input {
   width: 100%;
-  margin: 4px 0 0;
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.75);
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.rate-edit {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.rate-edit.morning { background: #fff200; color: #111; }
+.rate-edit.evening-wd { background: #c00000; color: #fff; }
+.rate-edit.evening-we { background: #0070c0; color: #fff; }
+.rate-edit.intern { background: #c65911; color: #fff; }
+
+.rate-edit.morning label,
+.rate-edit.intern label { color: #333; }
+.rate-edit.evening-wd label,
+.rate-edit.evening-we label { color: rgba(255, 255, 255, 0.86); }
+
+.rate-edit input {
+  background: rgba(255, 255, 255, 0.88);
   color: #111;
-  border-color: rgba(0, 0, 0, 0.15);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 520px) {
+  .rates-shorts {
+    grid-template-columns: 1fr;
+  }
+
+  .rate-edit {
+    grid-template-columns: 1fr;
+  }
 }
 
 .excel-card {

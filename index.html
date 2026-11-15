@@ -23,7 +23,7 @@
   </style>
   <script>
     (function () {
-      var BUILD = "108";
+      var BUILD = "109";
       var params = new URLSearchParams(location.search);
       window.forceJournalReload = function () {
         params.set("n", Date.now());
@@ -385,6 +385,19 @@
       <div class="a4-page" id="checklistPrint"></div>
     </section>
   </main>
+
+  <div id="ratesModal" class="modal rates-modal no-print" hidden>
+    <div class="modal-card rates-card">
+      <h2>Ставки · <span id="ratesVenueName">—</span></h2>
+      <p class="hint">Как смена пишется в табеле и сколько за неё платить</p>
+      <div class="rates-shorts" id="ratesShorts"></div>
+      <div class="rates-fields" id="ratesFields"></div>
+      <div class="row">
+        <button type="button" class="ghost" id="ratesCancel">Закрыть</button>
+        <button type="button" class="primary" id="ratesSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
 
   <div id="confirmModal" class="modal" hidden>
     <div class="modal-card">
