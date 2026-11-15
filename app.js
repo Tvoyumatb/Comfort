@@ -1,4 +1,4 @@
-const APP_VERSION = "103";
+const APP_VERSION = "104";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -940,9 +940,12 @@ function venueShort(id) {
   return VENUE_SHORT[id] || VENUES[id] || id;
 }
 
-function shiftCellHtml(venueId, type) {
-  const label = SHIFT_LABEL[type] || "/";
-  return `<small class="cell-place">${escapeHtml(venueShort(venueId))}</small><span>${escapeHtml(label)}</span>`;
+function venueIds() {
+  return Object.keys(VENUES);
+}
+
+function shiftCellHtml(type) {
+  return escapeHtml(SHIFT_LABEL[type] || "/");
 }
 
 function setVenue(id) {
@@ -1386,67 +1389,104 @@ function visibleEmployeesIn(venue) {
   return sharedEmployees().filter((emp) => !emp.leftOn || empHasPeriodWorkIn(venue, emp));
 }
 
+function visibleEmployeesAll() {
+  return sharedEmployees().filter((emp) =>
+    !emp.leftOn || venueIds().some((id) => empHasPeriodWorkIn(venueState(id), emp))
+  );
+}
+
 function visibleEmployees() {
-  return visibleEmployeesIn(state);
+  return visibleEmployeesAll();
 }
 
 function activeEmployees() {
   return sharedEmployees().filter((emp) => !emp.leftOn);
 }
 
-function rosterHtml(venue, venueId) {
+function rosterHtml() {
   const days = periodDays();
-  const people = visibleEmployeesIn(venue);
+  const people = visibleEmployeesAll();
   const head = `
     <tr>
       <th class="name">${MONTHS_RU[viewMonth.getMonth()]}</th>
       ${days.map((d) => `<th>${d.getDate()}</th>`).join("")}
     </tr>
   `;
-  const body = people.map((emp) => `
-    <tr>
+  const body = people.map((emp) => venueIds().map((id, i) => {
+    const venue = venueState(id);
+    return `
+    <tr class="venue-${id}${i === 0 ? " emp-first" : ""}">
       <th class="name">
-        ${escapeHtml(emp.name)}
-        <button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>
+        <span class="emp-line">${escapeHtml(emp.name)}</span>
+        <span class="cell-place">${escapeHtml(venueShort(id))}</span>
+        ${i === 0 ? `<button type="button" class="emp-remove" data-del-emp="${emp.id}">удалить</button>` : ""}
       </th>
       ${days.map((date) => {
         const iso = toISODate(date);
         const type = shiftType(venue.schedule?.[iso]?.[emp.id] || "");
         const cls = shiftClass(type, date);
-        return `<td><button type="button" class="cell ${cls} venue-${venueId}" data-emp="${emp.id}" data-day="${iso}" data-venue="${venueId}">${shiftCellHtml(venueId, type)}</button></td>`;
+        return `<td><button type="button" class="cell ${cls} venue-${id}" data-emp="${emp.id}" data-day="${iso}" data-venue="${id}">${shiftCellHtml(type)}</button></td>`;
       }).join("")}
-    </tr>
-  `).join("");
-  return `<table class="roster"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+    </tr>`;
+  }).join("")).join("");
+  return `<table class="roster roster-split"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
-function payHtml(venue, venueId) {
-  const rows = visibleEmployeesIn(venue).map((emp) => {
-    const c = countShiftsIn(venue, emp.id);
+function allRatesHtml() {
+  return venueIds().map((id) => `
+    <div class="rates-block venue-${id}">
+      <h3>${escapeHtml(venueShort(id))} · ставки</h3>
+      <div class="rates">${ratesHtml(venueState(id), id)}</div>
+    </div>
+  `).join("");
+}
+
+function shiftCountShort(c) {
+  return `${c.morning}у ${c.eveningWeekday}б ${c.eveningWeekend}в ${c.intern}с`;
+}
+
+function empPayBits(emp) {
+  return venueIds().reduce((acc, id) => {
+    const venue = venueState(id);
     const extra = extrasForVenue(venue, emp.id);
+    acc[id] = {
+      counts: countShiftsIn(venue, emp.id),
+      pay: payoutIn(venue, emp.id),
+      fines: Number(extra.fines || 0) + damageTotalIn(venue, emp.id),
+    };
+    return acc;
+  }, {});
+}
+
+function payHtmlAll() {
+  const people = visibleEmployeesAll();
+  const rows = people.map((emp) => {
+    const bits = empPayBits(emp);
+    const t = bits.tangiers;
+    const s = bits.shishka;
     return `
       <tr>
         <th class="name">${escapeHtml(emp.name)}</th>
-        <td>${c.morning}</td>
-        <td>${c.eveningWeekday}</td>
-        <td>${c.eveningWeekend}</td>
-        <td>${c.intern}</td>
-        <td>${formatSum(Number(extra.fines || 0) + damageTotalIn(venue, emp.id))}</td>
-        <td class="sum" data-pay-sum="${emp.id}" data-venue="${venueId}">${formatSum(payoutIn(venue, emp.id))}</td>
+        <td class="venue-tangiers">${shiftCountShort(t.counts)}</td>
+        <td class="sum venue-tangiers">${formatSum(t.pay)}</td>
+        <td class="venue-shishka">${shiftCountShort(s.counts)}</td>
+        <td class="sum venue-shishka">${formatSum(s.pay)}</td>
+        <td>${formatSum(t.fines + s.fines)}</td>
+        <td class="sum">${formatSum(t.pay + s.pay)}</td>
       </tr>
     `;
   }).join("");
   return `
-    <table class="pay">
+    <table class="pay pay-split">
       <thead>
         <tr>
           <th class="name">Сотрудник</th>
-          <th>Утро</th>
-          <th>Вечер будние</th>
-          <th>Вечер выходные</th>
-          <th>Стажировка</th>
+          <th>Танж смены</th>
+          <th>Танж ₽</th>
+          <th>Шишка смены</th>
+          <th>Шишка ₽</th>
           <th>Порча / штраф</th>
-          <th>К выплате</th>
+          <th>Итого</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -1454,13 +1494,13 @@ function payHtml(venue, venueId) {
   `;
 }
 
-function renderPayFor(venueId) {
-  const box = document.querySelector(`[data-pay="${venueId}"]`);
-  if (box) box.innerHTML = payHtml(venueState(venueId), venueId);
+function renderPayFor() {
+  renderPay();
 }
 
 function renderPay() {
-  Object.keys(VENUES).forEach(renderPayFor);
+  const box = document.querySelector("[data-pay]");
+  if (box) box.innerHTML = payHtmlAll();
 }
 
 function renderFines() {
@@ -1503,20 +1543,14 @@ function renderShifts() {
   renderPeriod();
   const box = $("#timesheetVenues");
   if (box) {
-    box.innerHTML = Object.keys(VENUES).map((id) => {
-      const venue = venueState(id);
-      return `
-        <section class="timesheet-venue venue-${id}" data-timesheet="${id}">
-          <h2 class="block-title timesheet-place">${escapeHtml(venueShort(id))} · ${escapeHtml(VENUES[id])}</h2>
-          <div class="rates">${ratesHtml(venue, id)}</div>
-          <div class="excel-card">
-            <div class="roster-wrap">${rosterHtml(venue, id)}</div>
-          </div>
-          <h2 class="block-title">Расчёт · ${escapeHtml(venueShort(id))}</h2>
-          <div class="excel-card pay-wrap" data-pay="${id}">${payHtml(venue, id)}</div>
-        </section>
-      `;
-    }).join("");
+    box.innerHTML = `
+      <div class="rates-duo">${allRatesHtml()}</div>
+      <div class="excel-card">
+        <div class="roster-wrap">${rosterHtml()}</div>
+      </div>
+      <h2 class="block-title">Расчёт</h2>
+      <div class="excel-card pay-wrap" data-pay>${payHtmlAll()}</div>
+    `;
   }
   renderFines();
   if (!$("#reportView")?.hidden) refreshOpenReport();
@@ -1527,55 +1561,63 @@ function reportPeriodLabel() {
   return `${MONTHS_RU[viewMonth.getMonth()]} ${days[0].getDate()}–${days[days.length - 1].getDate()} ${viewMonth.getFullYear()}`;
 }
 
-function timesheetReportHtml(venueId) {
-  const venue = venueState(venueId);
+function timesheetReportHtml() {
   const days = periodDays();
   const nameHtml = (text) => escapeHtml(text).replace(" ", "<br>");
-  const people = visibleEmployeesIn(venue);
+  const people = visibleEmployeesAll();
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${d.getDate()}</div>`),
-    ...people.flatMap((emp) => [
-      `<div class="rt-name">${nameHtml(emp.name)}</div>`,
+    ...people.flatMap((emp) => venueIds().flatMap((id, i) => [
+      `<div class="rt-name venue-${id}">${i === 0 ? nameHtml(emp.name) : ""}<small class="cell-place">${escapeHtml(venueShort(id))}</small></div>`,
       ...days.map((date) => {
-        const type = shiftType(venue.schedule?.[toISODate(date)]?.[emp.id] || "");
+        const type = shiftType(venueState(id).schedule?.[toISODate(date)]?.[emp.id] || "");
         const cls = shiftClass(type, date);
-        return `<div class="rt-shift cell ${cls} venue-${venueId}">${shiftCellHtml(venueId, type)}</div>`;
+        return `<div class="rt-shift cell ${cls} venue-${id}">${shiftCellHtml(type)}</div>`;
       }),
-    ]),
+    ])),
   ].join("");
 
   const payRows = people.map((emp) => {
-    const c = countShiftsIn(venue, emp.id);
-    const extra = extrasForVenue(venue, emp.id);
+    const bits = empPayBits(emp);
+    const t = bits.tangiers;
+    const s = bits.shishka;
     return `
       <tr>
         <th class="name">${escapeHtml(emp.name)}</th>
-        <td>${c.morning}</td>
-        <td>${c.eveningWeekday}</td>
-        <td>${c.eveningWeekend}</td>
-        <td>${c.intern}</td>
-        <td>${formatSum(Number(extra.fines || 0) + damageTotalIn(venue, emp.id))}</td>
+        <td class="venue-tangiers">${shiftCountShort(t.counts)}</td>
+        <td class="sum venue-tangiers">${formatSum(t.pay)}</td>
+        <td class="venue-shishka">${shiftCountShort(s.counts)}</td>
+        <td class="sum venue-shishka">${formatSum(s.pay)}</td>
+        <td>${formatSum(t.fines + s.fines)}</td>
       </tr>
     `;
   }).join("");
 
-  const lateFines = people
-    .map((emp) => ({ name: emp.name, sum: Number(extrasForVenue(venue, emp.id).fines || 0) }))
-    .filter((row) => row.sum > 0);
-  const damages = (venue.fines || [])
+  const lateFines = venueIds().flatMap((id) => people
+    .map((emp) => ({
+      name: emp.name,
+      place: venueShort(id),
+      sum: Number(extrasForVenue(venueState(id), emp.id).fines || 0),
+    }))
+    .filter((row) => row.sum > 0));
+  const damages = venueIds().flatMap((id) => (venueState(id).fines || [])
     .filter((f) => inCurrentPeriod(f.date))
+    .map((f) => ({ ...f, place: venueShort(id) })))
     .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   const lateTotal = lateFines.reduce((sum, row) => sum + row.sum, 0);
   const damageSum = damages.reduce((sum, f) => sum + Number(f.sum || 0), 0);
-  const rates = venue.rates || DEFAULT_RATES;
+  const ratesLine = venueIds().map((id) => {
+    const rates = venueState(id).rates || DEFAULT_RATES;
+    return `${venueShort(id)}: утро ${formatSum(rates.morning)} · будни ${formatSum(rates.eveningWeekday)} · пт–вс ${formatSum(rates.eveningWeekend)} · стаж ${formatSum(rates.intern)}`;
+  }).join("<br>");
   const lateTable = lateFines.length
     ? `<section class="report-fines">
         <h2>Штрафы</h2>
         <table class="pay report-table">
           <thead><tr><th class="name">Сотрудник</th><th>Штраф</th></tr></thead>
           <tbody>
-            ${lateFines.map((row) => `<tr><th class="name">${escapeHtml(row.name)}</th><td class="sum">${formatSum(row.sum)}</td></tr>`).join("")}
+            ${lateFines.map((row) => `<tr><th class="name">${escapeHtml(row.name)} · ${escapeHtml(row.place)}</th><td class="sum">${formatSum(row.sum)}</td></tr>`).join("")}
             <tr><th class="name">Итого</th><td class="sum">${formatSum(lateTotal)}</td></tr>
           </tbody>
         </table>
@@ -1599,7 +1641,7 @@ function timesheetReportHtml(venueId) {
               const emp = employeeById(f.empId);
               return `<tr>
                 <td>${parseISODate(f.date).toLocaleDateString("ru-RU")}</td>
-                <th class="name">${escapeHtml(emp?.name || "Сотрудник")}</th>
+                <th class="name">${escapeHtml(emp?.name || "Сотрудник")} · ${escapeHtml(f.place)}</th>
                 <th class="name">${escapeHtml(f.what)}</th>
                 <td>${f.qty}</td>
                 <td class="sum">${formatSum(f.sum)}</td>
@@ -1613,13 +1655,8 @@ function timesheetReportHtml(venueId) {
 
   return `
     <header class="report-head">
-      <h1>${escapeHtml(venueShort(venueId))} · ${escapeHtml(VENUES[venueId])} · ${reportPeriodLabel()}</h1>
-      <p class="report-rates">
-        Утро ${formatSum(rates.morning)} ·
-        будни ${formatSum(rates.eveningWeekday)} ·
-        пт–вс ${formatSum(rates.eveningWeekend)} ·
-        стаж ${formatSum(rates.intern)}
-      </p>
+      <h1>Табель · ${reportPeriodLabel()}</h1>
+      <p class="report-rates">${ratesLine}</p>
     </header>
     <div class="excel-card report-roster">
       <div class="report-timesheet" style="--days:${days.length};display:grid;grid-template-columns:minmax(0,7.6em) repeat(${days.length},minmax(0,1fr));width:100%;min-width:0">
@@ -1627,14 +1664,14 @@ function timesheetReportHtml(venueId) {
       </div>
     </div>
     <div class="excel-card report-pay">
-      <table class="pay" style="--rows:${people.length + 1}">
+      <table class="pay pay-split" style="--rows:${people.length + 1}">
         <thead>
           <tr>
             <th class="name">Сотрудник</th>
-            <th>Утро</th>
-            <th>Будни вечер</th>
-            <th>Выходной вечер</th>
-            <th>Стаж</th>
+            <th>Танж смены</th>
+            <th>Танж ₽</th>
+            <th>Шишка смены</th>
+            <th>Шишка ₽</th>
             <th>Порча / штраф</th>
           </tr>
         </thead>
@@ -1655,7 +1692,7 @@ function timesheetReportHtml(venueId) {
 function renderReport() {
   const paper = $("#reportPaper");
   if (!paper) return;
-  paper.innerHTML = Object.keys(VENUES).map(timesheetReportHtml).join("");
+  paper.innerHTML = timesheetReportHtml();
   requestAnimationFrame(() => requestAnimationFrame(fitReportPaper));
 }
 function syncReportOrientation() {
@@ -1844,7 +1881,7 @@ function cycleCell(btn) {
   save();
 
   const date = parseISODate(iso);
-  btn.innerHTML = shiftCellHtml(btn.dataset.venue, next);
+  btn.innerHTML = shiftCellHtml(next);
   btn.className = `cell ${shiftClass(next, date)} venue-${btn.dataset.venue}`;
   renderPayFor(btn.dataset.venue);
 }
@@ -3138,7 +3175,7 @@ $("#timesheetVenues")?.addEventListener("input", (e) => {
   if (!venue.rates) venue.rates = { ...DEFAULT_RATES };
   venue.rates[key] = Number(e.target.value || 0);
   save();
-  renderPayFor(venueId);
+  renderPay();
 });
 
 $("#fineForm").addEventListener("submit", (e) => {
