@@ -1,4 +1,4 @@
-const APP_VERSION = "113";
+const APP_VERSION = "114";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1816,7 +1816,7 @@ function timesheetReportHtml(venueId) {
   const venue = venueState(venueId);
   const days = periodDays();
   const nameHtml = (text) => escapeHtml(text).replace(" ", "<br>");
-  const people = visibleEmployeesIn(venue);
+  const people = visibleEmployeesIn(venue).filter((emp) => empHasPeriodWorkIn(venue, emp));
   const rosterCells = [
     `<div class="rt-head rt-name">${MONTHS_RU[viewMonth.getMonth()]}</div>`,
     ...days.map((d) => `<div class="rt-head rt-day">${dayHeadHtml(d)}</div>`),
