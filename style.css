@@ -68,14 +68,14 @@ body::before {
   z-index: -1;
   background:
     linear-gradient(180deg, rgba(8, 6, 5, 0.42) 0%, rgba(8, 6, 5, 0.62) 100%),
-    url("wallpaper-tangiers-2.jpg") center / cover no-repeat;
+    url("wallpaper-tangiers-3.jpg") center / cover no-repeat;
   pointer-events: none;
 }
 
 body[data-venue="shishka"]::before {
   background:
     linear-gradient(180deg, rgba(10, 12, 18, 0.48) 0%, rgba(10, 12, 18, 0.68) 100%),
-    url("wallpaper-tangiers-2.jpg") center / cover no-repeat;
+    url("wallpaper-tangiers-3.jpg") center / cover no-repeat;
 }
 
 .topbar {
