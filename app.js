@@ -1,4 +1,4 @@
-const APP_VERSION = "115";
+const APP_VERSION = "116";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -245,6 +245,7 @@ function emptyState(venueId = "tangiers") {
   return {
     employees: DEFAULT_EMPLOYEES.map((name) => ({ id: uid(), name })),
     schedule: {},
+    scheduleAt: 0,
     extras: {},
     rates: { ...DEFAULT_RATES },
     rateNames: { ...DEFAULT_RATE_NAMES },
@@ -530,6 +531,7 @@ function normalizeVenue(data, venueId) {
   const venue = {
     employees: data.employees?.length ? data.employees : base.employees,
     schedule: data.schedule || {},
+    scheduleAt: Number(data.scheduleAt || 0),
     extras: data.extras || {},
     rates: { ...DEFAULT_RATES, ...(data.rates || {}) },
     rateNames: { ...DEFAULT_RATE_NAMES, ...(data.rateNames || {}) },
@@ -681,16 +683,18 @@ function mergeRowsBy(older = [], newer = [], keyFn) {
   return [...map.values()];
 }
 
-function mergeSchedule(older = {}, newer = {}) {
+function copyDay(day = {}) {
   const out = {};
-  new Set([...Object.keys(older || {}), ...Object.keys(newer || {})]).forEach((iso) => {
-    const a = older?.[iso] || {};
-    const b = newer?.[iso] || {};
-    const day = {};
-    new Set([...Object.keys(a), ...Object.keys(b)]).forEach((emp) => {
-      const val = b[emp] || a[emp];
-      if (val) day[emp] = val;
-    });
+  Object.entries(day).forEach(([emp, val]) => {
+    if (val) out[emp] = val;
+  });
+  return out;
+}
+
+function mergeSchedule(winner = {}, loser = {}) {
+  const out = {};
+  new Set([...Object.keys(winner || {}), ...Object.keys(loser || {})]).forEach((iso) => {
+    const day = winner[iso] != null ? copyDay(winner[iso]) : copyDay(loser[iso]);
     if (Object.keys(day).length) out[iso] = day;
   });
   return out;
@@ -735,11 +739,16 @@ function mergeEmployees(older = [], newer = []) {
 function mergeVenue(older, newer) {
   if (!older) return newer;
   if (!newer) return older;
+  const olderAt = Number(older.scheduleAt || 0);
+  const newerAt = Number(newer.scheduleAt || 0);
+  const win = newerAt >= olderAt ? newer : older;
+  const lose = win === newer ? older : newer;
   return {
     ...older,
     ...newer,
     employees: mergeEmployees(older.employees, newer.employees),
-    schedule: mergeSchedule(older.schedule, newer.schedule),
+    schedule: mergeSchedule(win.schedule, lose.schedule),
+    scheduleAt: Math.max(olderAt, newerAt),
     extras: mergeExtras(older.extras, newer.extras),
     rates: { ...DEFAULT_RATES, ...(older.rates || {}), ...(newer.rates || {}) },
     rateNames: { ...DEFAULT_RATE_NAMES, ...(older.rateNames || {}), ...(newer.rateNames || {}) },
@@ -995,6 +1004,16 @@ function queueCloudPush() {
   }, 700);
 }
 
+function flushCloud() {
+  window.clearTimeout(cloudTimer);
+  if (cloudReady) pushCloud();
+}
+
+function saveJournalNow() {
+  save();
+  flushCloud();
+}
+
 function bindMqttSocket(ws, url) {
   ws.binaryType = "arraybuffer";
   ws.addEventListener("message", (event) => {
@@ -1076,8 +1095,11 @@ async function bootCloud() {
     pushCloud();
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") mqttConnectAll();
+    if (document.visibilityState === "hidden") flushCloud();
+    else mqttConnectAll();
   });
+  window.addEventListener("pagehide", flushCloud);
+  window.addEventListener("beforeunload", flushCloud);
   window.addEventListener("online", () => mqttConnectAll());
   $("#syncStatus")?.addEventListener("click", async () => {
     setSyncStatus("Обновляю…");
@@ -1582,10 +1604,13 @@ function ratesHtml(venue) {
   const rates = venueRates(venue);
   const line = RATE_FIELDS.map((row) => `${rateTitle(venue, row.key)} ${formatSum(rates[row.key])}`).join(" · ");
   return `
-    <button type="button" class="rates-open" data-open-rates>
-      <strong>Ставки смен</strong>
-      <span>${escapeHtml(line)}</span>
-    </button>
+    <div class="rates-row">
+      <button type="button" class="rates-open" data-open-rates>
+        <strong>Ставки смен</strong>
+        <span>${escapeHtml(line)}</span>
+      </button>
+      <button type="button" class="rates-save" data-save-journal>Сохранить</button>
+    </div>
   `;
 }
 
@@ -2115,19 +2140,30 @@ function syncReportBtn() {
 function cycleCell(btn) {
   const empId = btn.dataset.emp;
   const iso = btn.dataset.day;
-  const venue = venueState(btn.dataset.venue);
+  const venueId = btn.dataset.venue;
+  const venue = venueState(venueId);
   if (!venue.schedule) venue.schedule = {};
   if (!venue.schedule[iso]) venue.schedule[iso] = {};
   const current = shiftType(venue.schedule[iso][empId] || "");
   const next = SHIFT_ORDER[(Math.max(0, SHIFT_ORDER.indexOf(current)) + 1) % SHIFT_ORDER.length];
-  if (next) venue.schedule[iso][empId] = next;
-  else delete venue.schedule[iso][empId];
+  if (next) {
+    venue.schedule[iso][empId] = next;
+    const other = venueState(otherVenueId(venueId));
+    if (other.schedule?.[iso]?.[empId]) {
+      delete other.schedule[iso][empId];
+      other.scheduleAt = Date.now();
+    }
+  } else {
+    delete venue.schedule[iso][empId];
+  }
+  venue.scheduleAt = Date.now();
   save();
 
   paintShiftButton(btn);
-  const otherBtn = document.querySelector(`.cell[data-emp="${empId}"][data-day="${iso}"][data-venue="${otherVenueId(btn.dataset.venue)}"]`);
+  const otherBtn = document.querySelector(`.cell[data-emp="${empId}"][data-day="${iso}"][data-venue="${otherVenueId(venueId)}"]`);
   if (otherBtn) paintShiftButton(otherBtn);
-  renderPayFor(btn.dataset.venue);
+  renderPayFor(venueId);
+  renderPayFor(otherVenueId(venueId));
 }
 
 function setTodayDefaults() {
@@ -3394,6 +3430,10 @@ $("#nextPeriod").addEventListener("click", () => {
 });
 
 $("#timesheetVenues")?.addEventListener("click", (e) => {
+  if (e.target.closest("[data-save-journal]")) {
+    saveJournalNow();
+    return;
+  }
   if (e.target.closest("[data-open-rates]")) {
     openRatesModal();
     return;

@@ -1053,6 +1053,29 @@ input[type="number"] {
   margin-bottom: 12px;
 }
 
+.rates-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.rates-save {
+  min-width: 108px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 0;
+  background: var(--accent);
+  color: #1a1510;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+body[data-venue="shishka"] .rates-save {
+  color: #10141c;
+}
+
 .rates-open {
   width: 100%;
   text-align: left;
