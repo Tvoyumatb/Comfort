@@ -1,4 +1,4 @@
-const APP_VERSION = "120";
+const APP_VERSION = "121";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -701,7 +701,11 @@ function mergeSchedule(left = {}, right = {}) {
       else if (one == null) pick = two;
       else pick = shiftStamp(two) >= shiftStamp(one) ? two : one;
       const type = shiftValue(pick);
-      if (type) day[emp] = typeof pick === "object" && "t" in pick ? pick : shiftEntry(type, shiftStamp(pick));
+      if (type) {
+        day[emp] = typeof pick === "object" && "t" in pick ? pick : shiftEntry(type, shiftStamp(pick));
+      } else if (pick && typeof pick === "object" && "t" in pick) {
+        day[emp] = pick;
+      }
     });
     if (Object.keys(day).length) out[iso] = day;
   });
@@ -2259,6 +2263,11 @@ function cycleCell(btn) {
     other.scheduleAt = now;
   } else {
     venue.schedule[iso][empId] = shiftEntry("", now);
+    const other = venueState(otherVenueId(venueId));
+    if (!other.schedule) other.schedule = {};
+    if (!other.schedule[iso]) other.schedule[iso] = {};
+    other.schedule[iso][empId] = shiftEntry("", now);
+    other.scheduleAt = now;
   }
   venue.scheduleAt = now;
   save();
