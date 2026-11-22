@@ -1,4 +1,4 @@
-const APP_VERSION = "121";
+const APP_VERSION = "122";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -694,18 +694,8 @@ function mergeSchedule(left = {}, right = {}) {
     const b = right[iso] || {};
     const day = {};
     new Set([...Object.keys(a), ...Object.keys(b)]).forEach((emp) => {
-      const one = a[emp];
-      const two = b[emp];
-      let pick = one;
-      if (two == null) pick = one;
-      else if (one == null) pick = two;
-      else pick = shiftStamp(two) >= shiftStamp(one) ? two : one;
-      const type = shiftValue(pick);
-      if (type) {
-        day[emp] = typeof pick === "object" && "t" in pick ? pick : shiftEntry(type, shiftStamp(pick));
-      } else if (pick && typeof pick === "object" && "t" in pick) {
-        day[emp] = pick;
-      }
+      const pick = keepShift(pickShift(a[emp], b[emp]));
+      if (pick) day[emp] = pick;
     });
     if (Object.keys(day).length) out[iso] = day;
   });
@@ -1008,7 +998,7 @@ function handleCloudMessage(text) {
     return;
   }
   applyRemote(merged, "Связь есть · телефон и ноут");
-  if (dbFill(merged) > dbFill(remote)) queueCloudPush();
+  if (packedVenuesJson(merged) !== packedVenuesJson(remote)) queueCloudPush();
 }
 
 function liveMqttSockets() {
@@ -1023,9 +1013,6 @@ function pushCloud() {
     return false;
   }
   const outgoing = lastRemote ? mergePacked(packedDb(), lastRemote) : packedDb();
-  if (packedVenuesJson(outgoing) !== packedVenuesJson(packedDb())) {
-    adoptPacked(outgoing, false);
-  }
   const body = JSON.stringify(outgoing);
   lastPushJson = body;
   lastRemote = outgoing;
@@ -1046,8 +1033,9 @@ async function loadRestoreCopy() {
 }
 
 function pickRicher(a, b) {
-  if (b && dbFill(b) > dbFill(a)) return b;
-  return a;
+  if (!b?.venues) return a;
+  if (!a?.venues) return b;
+  return mergePacked(a, b);
 }
 
 function queueCloudPush() {
@@ -1238,7 +1226,7 @@ function cellContentHtml(venueId, empId, date, showOther = true) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
   if (type) return shiftCellHtml(type, venueId);
-  if (showOther) {
+  if (showOther && !isShiftTombstone(venueState(venueId).schedule?.[iso]?.[empId])) {
     const away = elsewhereMark(venueId, empId, iso);
     if (away) {
       return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${shiftCellHtml(away.type, away.other)}</span>`;
@@ -1251,7 +1239,7 @@ function cellClassName(venueId, empId, date, showOther = true) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
   if (type) return `cell ${shiftClass(type, date)}`;
-  if (showOther) {
+  if (showOther && !isShiftTombstone(venueState(venueId).schedule?.[iso]?.[empId])) {
     const away = elsewhereMark(venueId, empId, iso);
     if (away) return `cell elsewhere venue-${away.other}`;
   }
@@ -1292,7 +1280,9 @@ function remapEmpId(venue, fromId, toId) {
   if (!venue || !fromId || fromId === toId) return;
   Object.values(venue.schedule || {}).forEach((day) => {
     if (!day || day[fromId] == null) return;
-    if (day[fromId]) day[toId] = day[fromId];
+    const pick = keepShift(pickShift(day[toId], day[fromId]));
+    if (pick) day[toId] = pick;
+    else delete day[toId];
     delete day[fromId];
   });
   Object.values(venue.extras || {}).forEach((period) => {
@@ -1424,6 +1414,36 @@ function shiftStamp(raw) {
 
 function shiftEntry(type, at = Date.now()) {
   return { t: shiftType(type) || "", at: Number(at) || Date.now() };
+}
+
+function isShiftTombstone(raw) {
+  return Boolean(raw && typeof raw === "object" && "t" in raw && !shiftValue(raw));
+}
+
+function pickShift(one, two) {
+  if (two == null) return one;
+  if (one == null) return two;
+  const left = shiftStamp(one);
+  const right = shiftStamp(two);
+  if (right !== left) return right > left ? two : one;
+  if (isShiftTombstone(two)) return two;
+  if (isShiftTombstone(one)) return one;
+  return two;
+}
+
+function keepShift(pick) {
+  if (pick == null || pick === "") return null;
+  const type = shiftValue(pick);
+  if (type) return typeof pick === "object" && "t" in pick ? pick : shiftEntry(type, shiftStamp(pick));
+  return isShiftTombstone(pick) ? pick : null;
+}
+
+function displayedShift(venueId, empId, iso) {
+  const raw = venueState(venueId).schedule?.[iso]?.[empId];
+  const type = shiftValue(raw);
+  if (type) return type;
+  if (isShiftTombstone(raw)) return "";
+  return elsewhereMark(venueId, empId, iso)?.type || "";
 }
 
 function shiftClass(type, date) {
@@ -2251,7 +2271,7 @@ function cycleCell(btn) {
   const venue = venueState(venueId);
   if (!venue.schedule) venue.schedule = {};
   if (!venue.schedule[iso]) venue.schedule[iso] = {};
-  const current = shiftValue(venue.schedule[iso][empId]);
+  const current = displayedShift(venueId, empId, iso);
   const next = SHIFT_ORDER[(Math.max(0, SHIFT_ORDER.indexOf(current)) + 1) % SHIFT_ORDER.length];
   const now = Date.now();
   if (next) {
