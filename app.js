@@ -1,4 +1,4 @@
-const APP_VERSION = "122";
+const APP_VERSION = "123";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -1226,7 +1226,7 @@ function cellContentHtml(venueId, empId, date, showOther = true) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
   if (type) return shiftCellHtml(type, venueId);
-  if (showOther && !isShiftTombstone(venueState(venueId).schedule?.[iso]?.[empId])) {
+  if (showOther) {
     const away = elsewhereMark(venueId, empId, iso);
     if (away) {
       return `<small class="cell-place">${escapeHtml(venueShort(away.other))}</small><span>${shiftCellHtml(away.type, away.other)}</span>`;
@@ -1239,7 +1239,7 @@ function cellClassName(venueId, empId, date, showOther = true) {
   const iso = toISODate(date);
   const type = shiftOn(venueId, empId, iso);
   if (type) return `cell ${shiftClass(type, date)}`;
-  if (showOther && !isShiftTombstone(venueState(venueId).schedule?.[iso]?.[empId])) {
+  if (showOther) {
     const away = elsewhereMark(venueId, empId, iso);
     if (away) return `cell elsewhere venue-${away.other}`;
   }
@@ -1436,14 +1436,6 @@ function keepShift(pick) {
   const type = shiftValue(pick);
   if (type) return typeof pick === "object" && "t" in pick ? pick : shiftEntry(type, shiftStamp(pick));
   return isShiftTombstone(pick) ? pick : null;
-}
-
-function displayedShift(venueId, empId, iso) {
-  const raw = venueState(venueId).schedule?.[iso]?.[empId];
-  const type = shiftValue(raw);
-  if (type) return type;
-  if (isShiftTombstone(raw)) return "";
-  return elsewhereMark(venueId, empId, iso)?.type || "";
 }
 
 function shiftClass(type, date) {
@@ -2271,7 +2263,7 @@ function cycleCell(btn) {
   const venue = venueState(venueId);
   if (!venue.schedule) venue.schedule = {};
   if (!venue.schedule[iso]) venue.schedule[iso] = {};
-  const current = displayedShift(venueId, empId, iso);
+  const current = shiftValue(venue.schedule[iso][empId]);
   const next = SHIFT_ORDER[(Math.max(0, SHIFT_ORDER.indexOf(current)) + 1) % SHIFT_ORDER.length];
   const now = Date.now();
   if (next) {
@@ -2283,11 +2275,6 @@ function cycleCell(btn) {
     other.scheduleAt = now;
   } else {
     venue.schedule[iso][empId] = shiftEntry("", now);
-    const other = venueState(otherVenueId(venueId));
-    if (!other.schedule) other.schedule = {};
-    if (!other.schedule[iso]) other.schedule[iso] = {};
-    other.schedule[iso][empId] = shiftEntry("", now);
-    other.scheduleAt = now;
   }
   venue.scheduleAt = now;
   save();
