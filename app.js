@@ -1,4 +1,4 @@
-const APP_VERSION = "117";
+const APP_VERSION = "118";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -735,7 +735,7 @@ function mergeEmployees(older = [], newer = []) {
       return;
     }
     if (emp.id && !prev.id) prev.id = emp.id;
-    if (!emp.leftOn) prev.leftOn = "";
+    if (emp.leftOn && (!prev.leftOn || emp.leftOn < prev.leftOn)) prev.leftOn = emp.leftOn;
   });
   return [...byName.values()];
 }
@@ -1267,8 +1267,7 @@ function shareStaffIn(root = db) {
       });
       return;
     }
-    if (emp.leftOn && prev.leftOn && emp.leftOn < prev.leftOn) prev.leftOn = emp.leftOn;
-    if (!emp.leftOn) prev.leftOn = "";
+    if (emp.leftOn && (!prev.leftOn || emp.leftOn < prev.leftOn)) prev.leftOn = emp.leftOn;
   });
   const merged = [...byName.values()];
   const nameToId = new Map(merged.map((emp) => [normalizeName(emp.name), emp.id]));
@@ -1726,14 +1725,28 @@ function empHasPeriodWork(emp) {
   return empHasPeriodWorkIn(state, emp);
 }
 
+function periodAfterLeave(emp) {
+  if (!emp?.leftOn) return false;
+  const days = periodDays();
+  return days.length > 0 && toISODate(days[0]) > emp.leftOn;
+}
+
 function visibleEmployeesIn(venue) {
-  return sharedEmployees().filter((emp) => !emp.leftOn || empHasPeriodWorkIn(venue, emp));
+  return sharedEmployees().filter((emp) => {
+    if (isPlaceholderEmployee(emp)) return false;
+    if (!emp.leftOn) return true;
+    if (periodAfterLeave(emp)) return false;
+    return empHasPeriodWorkIn(venue, emp);
+  });
 }
 
 function visibleEmployeesAll() {
-  return sharedEmployees().filter((emp) =>
-    !emp.leftOn || venueIds().some((id) => empHasPeriodWorkIn(venueState(id), emp))
-  );
+  return sharedEmployees().filter((emp) => {
+    if (isPlaceholderEmployee(emp)) return false;
+    if (!emp.leftOn) return true;
+    if (periodAfterLeave(emp)) return false;
+    return venueIds().some((id) => empHasPeriodWorkIn(venueState(id), emp));
+  });
 }
 
 function visibleEmployees() {
@@ -3484,6 +3497,15 @@ $("#timesheetVenues")?.addEventListener("click", (e) => {
       setSharedEmployees(people.filter((row) => row.id !== emp.id));
     } else {
       emp.leftOn = todayISO();
+      const now = Date.now();
+      venueIds().forEach((id) => {
+        const venue = venueState(id);
+        Object.keys(venue.schedule || {}).forEach((iso) => {
+          if (iso > emp.leftOn && venue.schedule[iso]?.[emp.id] != null) {
+            venue.schedule[iso][emp.id] = shiftEntry("", now);
+          }
+        });
+      });
     }
     save();
     renderShifts();
@@ -3526,7 +3548,16 @@ $("#addEmployeeForm").addEventListener("submit", (e) => {
   const name = new FormData(e.target).get("name").trim();
   if (!name) return;
   const people = sharedEmployees();
-  if (people.some((emp) => normalizeName(emp.name) === normalizeName(name))) return;
+  const existing = people.find((emp) => normalizeName(emp.name) === normalizeName(name));
+  if (existing) {
+    if (existing.leftOn) {
+      existing.leftOn = "";
+      save();
+      e.target.reset();
+      renderShifts();
+    }
+    return;
+  }
   people.push({ id: uid(), name });
   setSharedEmployees(people);
   save();
