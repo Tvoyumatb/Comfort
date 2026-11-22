@@ -1,4 +1,4 @@
-const APP_VERSION = "116";
+const APP_VERSION = "117";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -641,7 +641,7 @@ function dbFill(raw) {
   Object.values(venues).forEach((venue) => {
     if (!venue) return;
     Object.values(venue.schedule || {}).forEach((day) => {
-      n += Object.keys(day || {}).length;
+      n += Object.values(day || {}).filter((cell) => shiftValue(cell)).length;
     });
     n += (venue.tobacco || []).length;
     n += (venue.fines || []).length;
@@ -683,18 +683,22 @@ function mergeRowsBy(older = [], newer = [], keyFn) {
   return [...map.values()];
 }
 
-function copyDay(day = {}) {
+function mergeSchedule(left = {}, right = {}) {
   const out = {};
-  Object.entries(day).forEach(([emp, val]) => {
-    if (val) out[emp] = val;
-  });
-  return out;
-}
-
-function mergeSchedule(winner = {}, loser = {}) {
-  const out = {};
-  new Set([...Object.keys(winner || {}), ...Object.keys(loser || {})]).forEach((iso) => {
-    const day = winner[iso] != null ? copyDay(winner[iso]) : copyDay(loser[iso]);
+  new Set([...Object.keys(left || {}), ...Object.keys(right || {})]).forEach((iso) => {
+    const a = left[iso] || {};
+    const b = right[iso] || {};
+    const day = {};
+    new Set([...Object.keys(a), ...Object.keys(b)]).forEach((emp) => {
+      const one = a[emp];
+      const two = b[emp];
+      let pick = one;
+      if (two == null) pick = one;
+      else if (one == null) pick = two;
+      else pick = shiftStamp(two) >= shiftStamp(one) ? two : one;
+      const type = shiftValue(pick);
+      if (type) day[emp] = typeof pick === "object" && "t" in pick ? pick : shiftEntry(type, shiftStamp(pick));
+    });
     if (Object.keys(day).length) out[iso] = day;
   });
   return out;
@@ -739,16 +743,12 @@ function mergeEmployees(older = [], newer = []) {
 function mergeVenue(older, newer) {
   if (!older) return newer;
   if (!newer) return older;
-  const olderAt = Number(older.scheduleAt || 0);
-  const newerAt = Number(newer.scheduleAt || 0);
-  const win = newerAt >= olderAt ? newer : older;
-  const lose = win === newer ? older : newer;
   return {
     ...older,
     ...newer,
     employees: mergeEmployees(older.employees, newer.employees),
-    schedule: mergeSchedule(win.schedule, lose.schedule),
-    scheduleAt: Math.max(olderAt, newerAt),
+    schedule: mergeSchedule(older.schedule, newer.schedule),
+    scheduleAt: Math.max(Number(older.scheduleAt || 0), Number(newer.scheduleAt || 0)),
     extras: mergeExtras(older.extras, newer.extras),
     rates: { ...DEFAULT_RATES, ...(older.rates || {}), ...(newer.rates || {}) },
     rateNames: { ...DEFAULT_RATE_NAMES, ...(older.rateNames || {}), ...(newer.rateNames || {}) },
@@ -807,7 +807,7 @@ function setSyncStatus(text) {
 function save() {
   db.updatedAt = Date.now();
   lastLocalEdit = db.updatedAt;
-  ignoreRemoteUntil = Date.now() + 3500;
+  ignoreRemoteUntil = Date.now() + 600;
   saveLocal();
   queueCloudPush();
 }
@@ -938,11 +938,18 @@ function applyRemote(remote, status) {
   }
 }
 
-function handleCloudMessage(text) {
-  if (text && text === lastPushJson) {
-    setSyncStatus("Сохранено на телефон и ноут");
-    return;
+function adoptPacked(raw, rerender = false) {
+  cloudApplying = true;
+  applyCloud(raw);
+  saveLocal();
+  if (rerender) {
+    syncVenueUi();
+    render();
   }
+  cloudApplying = false;
+}
+
+function handleCloudMessage(text) {
   const remote = asJournal(text);
   if (!remote?.venues) return;
   lastRemote = remote;
@@ -953,7 +960,7 @@ function handleCloudMessage(text) {
     setSyncStatus("Данные с телефона и ноута");
     return;
   }
-  applyRemote(merged, "Подтянул свежие данные");
+  applyRemote(merged, "Данные с телефона и ноута");
 }
 
 function liveMqttSockets() {
@@ -968,6 +975,9 @@ function pushCloud() {
     return false;
   }
   const outgoing = lastRemote ? mergePacked(packedDb(), lastRemote) : packedDb();
+  if (packedVenuesJson(outgoing) !== packedVenuesJson(packedDb())) {
+    adoptPacked(outgoing, false);
+  }
   const body = JSON.stringify(outgoing);
   lastPushJson = body;
   lastRemote = outgoing;
@@ -1095,8 +1105,17 @@ async function bootCloud() {
     pushCloud();
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flushCloud();
-    else mqttConnectAll();
+    if (document.visibilityState === "hidden") {
+      flushCloud();
+      return;
+    }
+    mqttConnectAll();
+    if (lastRemote?.venues) {
+      const merged = mergePacked(packedDb(), lastRemote);
+      if (packedVenuesJson(merged) !== packedVenuesJson(packedDb())) {
+        applyRemote(merged, "Данные с телефона и ноута");
+      }
+    }
   });
   window.addEventListener("pagehide", flushCloud);
   window.addEventListener("beforeunload", flushCloud);
@@ -1132,7 +1151,7 @@ function otherVenueId(id) {
 }
 
 function shiftOn(venueId, empId, iso) {
-  return shiftType(venueState(venueId).schedule?.[iso]?.[empId] || "");
+  return shiftValue(venueState(venueId).schedule?.[iso]?.[empId]);
 }
 
 function venueRates(venue) {
@@ -1331,6 +1350,21 @@ function dayHeadHtml(date) {
 
 function shiftType(type) {
   return type === "eveningWe" ? "evening" : (type || "");
+}
+
+function shiftValue(raw) {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "object") return shiftType(raw.t || raw.type || "");
+  return shiftType(raw);
+}
+
+function shiftStamp(raw) {
+  if (raw && typeof raw === "object") return Number(raw.at || 0);
+  return 0;
+}
+
+function shiftEntry(type, at = Date.now()) {
+  return { t: shiftType(type) || "", at: Number(at) || Date.now() };
 }
 
 function shiftClass(type, date) {
@@ -1557,7 +1591,7 @@ function extrasFor(empId) {
 function countShiftsIn(venue, empId) {
   const counts = { morning: 0, eveningWeekday: 0, eveningWeekend: 0, intern: 0 };
   periodDays().forEach((date) => {
-    const type = shiftType(venue.schedule?.[toISODate(date)]?.[empId] || "");
+    const type = shiftValue(venue.schedule?.[toISODate(date)]?.[empId]);
     if (type === "morning") counts.morning += 1;
     if (type === "intern") counts.intern += 1;
     if (type === "evening") {
@@ -1685,7 +1719,7 @@ function isPlaceholderEmployee(emp) {
 }
 
 function empHasPeriodWorkIn(venue, emp) {
-  return periodDays().some((date) => venue.schedule?.[toISODate(date)]?.[emp.id]);
+  return periodDays().some((date) => shiftValue(venue.schedule?.[toISODate(date)]?.[emp.id]));
 }
 
 function empHasPeriodWork(emp) {
@@ -2144,19 +2178,20 @@ function cycleCell(btn) {
   const venue = venueState(venueId);
   if (!venue.schedule) venue.schedule = {};
   if (!venue.schedule[iso]) venue.schedule[iso] = {};
-  const current = shiftType(venue.schedule[iso][empId] || "");
+  const current = shiftValue(venue.schedule[iso][empId]);
   const next = SHIFT_ORDER[(Math.max(0, SHIFT_ORDER.indexOf(current)) + 1) % SHIFT_ORDER.length];
+  const now = Date.now();
   if (next) {
-    venue.schedule[iso][empId] = next;
+    venue.schedule[iso][empId] = shiftEntry(next, now);
     const other = venueState(otherVenueId(venueId));
-    if (other.schedule?.[iso]?.[empId]) {
-      delete other.schedule[iso][empId];
-      other.scheduleAt = Date.now();
-    }
+    if (!other.schedule) other.schedule = {};
+    if (!other.schedule[iso]) other.schedule[iso] = {};
+    other.schedule[iso][empId] = shiftEntry("", now);
+    other.scheduleAt = now;
   } else {
-    delete venue.schedule[iso][empId];
+    venue.schedule[iso][empId] = shiftEntry("", now);
   }
-  venue.scheduleAt = Date.now();
+  venue.scheduleAt = now;
   save();
 
   paintShiftButton(btn);
