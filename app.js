@@ -1,4 +1,4 @@
-const APP_VERSION = "119";
+const APP_VERSION = "120";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -652,6 +652,7 @@ function dbFill(raw) {
     n += (venue.revisions || []).length;
     n += Object.keys(venue.extras || {}).length;
   });
+  n += Object.keys(raw.removedStaff || {}).length;
   return n;
 }
 
@@ -832,7 +833,6 @@ function setSyncStatus(text) {
 function save() {
   db.updatedAt = Date.now();
   lastLocalEdit = db.updatedAt;
-  ignoreRemoteUntil = Date.now() + 600;
   saveLocal();
   queueCloudPush();
 }
@@ -844,7 +844,7 @@ let mqttPing = 0;
 let lastRemote = null;
 let lastPushJson = "";
 let lastLocalEdit = 0;
-let ignoreRemoteUntil = 0;
+let mqttPacketId = 1;
 const mqttSockets = [];
 const mqttEncoder = new TextEncoder();
 const mqttDecoder = new TextDecoder();
@@ -896,12 +896,27 @@ function mqttConnectPacket() {
   return mqttPacket(0x10, mqttConcat([header, mqttStr(id)]));
 }
 
+function nextMqttId() {
+  mqttPacketId = (mqttPacketId % 65535) + 1;
+  return mqttPacketId;
+}
+
+function mqttIdBytes(id) {
+  return Uint8Array.of((id >> 8) & 255, id & 255);
+}
+
 function mqttPublishPacket(text) {
-  return mqttPacket(0x31, mqttConcat([mqttStr(MQTT_TOPIC), mqttEncoder.encode(text)]));
+  const id = nextMqttId();
+  return mqttPacket(0x33, mqttConcat([mqttStr(MQTT_TOPIC), mqttIdBytes(id), mqttEncoder.encode(text)]));
 }
 
 function mqttSubscribePacket() {
-  return mqttPacket(0x82, mqttConcat([Uint8Array.of(0, 1), mqttStr(MQTT_TOPIC), Uint8Array.of(0)]));
+  const id = nextMqttId();
+  return mqttPacket(0x82, mqttConcat([mqttIdBytes(id), mqttStr(MQTT_TOPIC), Uint8Array.of(1)]));
+}
+
+function mqttPubAck(id) {
+  return mqttPacket(0x40, mqttIdBytes(id));
 }
 
 function mqttParse(buffer) {
@@ -975,17 +990,21 @@ function adoptPacked(raw, rerender = false) {
 }
 
 function handleCloudMessage(text) {
+  if (text && text === lastPushJson) {
+    setSyncStatus("Связь есть · телефон и ноут");
+    return;
+  }
   const remote = asJournal(text);
   if (!remote?.venues) return;
   lastRemote = remote;
   if (cloudApplying) return;
-  if (Date.now() < ignoreRemoteUntil) return;
   const merged = mergePacked(packedDb(), remote);
   if (packedVenuesJson(merged) === packedVenuesJson(packedDb())) {
-    setSyncStatus("Данные с телефона и ноута");
+    setSyncStatus("Связь есть · телефон и ноут");
     return;
   }
-  applyRemote(merged, "Данные с телефона и ноута");
+  applyRemote(merged, "Связь есть · телефон и ноут");
+  if (dbFill(merged) > dbFill(remote)) queueCloudPush();
 }
 
 function liveMqttSockets() {
@@ -1008,7 +1027,7 @@ function pushCloud() {
   lastRemote = outgoing;
   const packet = mqttPublishPacket(body);
   open.forEach((ws) => ws.send(packet));
-  setSyncStatus("Сохранено на телефон и ноут");
+  setSyncStatus("Связь есть · телефон и ноут");
   return true;
 }
 
@@ -1036,7 +1055,7 @@ function queueCloudPush() {
       return;
     }
     pushCloud();
-  }, 700);
+  }, 50);
 }
 
 function flushCloud() {
@@ -1055,13 +1074,20 @@ function bindMqttSocket(ws, url) {
     mqttParse(event.data).forEach((packet) => {
       if (packet.type === 2) {
         ws.send(mqttSubscribePacket());
+        cloudReady = true;
+        pushCloud();
         return;
       }
       if (packet.type !== 3) return;
       const payload = packet.payload;
       const topicLen = (payload[0] << 8) + payload[1];
       const qos = (packet.flags >> 1) & 3;
-      const start = 2 + topicLen + (qos ? 2 : 0);
+      let start = 2 + topicLen;
+      if (qos) {
+        const pid = (payload[start] << 8) + payload[start + 1];
+        start += 2;
+        ws.send(mqttPubAck(pid));
+      }
       handleCloudMessage(mqttDecoder.decode(payload.slice(start)));
     });
   });
@@ -1102,7 +1128,7 @@ function startMqttPing() {
   window.clearInterval(mqttPing);
   mqttPing = window.setInterval(() => {
     liveMqttSockets().forEach((ws) => ws.send(Uint8Array.of(0xc0, 0x00)));
-  }, 20000);
+  }, 12000);
 }
 
 async function bootCloud() {
@@ -1138,9 +1164,10 @@ async function bootCloud() {
     if (lastRemote?.venues) {
       const merged = mergePacked(packedDb(), lastRemote);
       if (packedVenuesJson(merged) !== packedVenuesJson(packedDb())) {
-        applyRemote(merged, "Данные с телефона и ноута");
+        applyRemote(merged, "Связь есть · телефон и ноут");
       }
     }
+    pushCloud();
   });
   window.addEventListener("pagehide", flushCloud);
   window.addEventListener("beforeunload", flushCloud);
