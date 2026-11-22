@@ -1,4 +1,4 @@
-const APP_VERSION = "118";
+const APP_VERSION = "119";
 const APP_NOTES = "";
 const RESTORE_URL = "./journal-restore.json?n=" + Date.now();
 const KEY = "shop-reports-v4";
@@ -608,6 +608,7 @@ function unpackDb(raw) {
   const empty = {
     current: "tangiers",
     updatedAt: 0,
+    removedStaff: {},
     venues: {
       tangiers: normalizeVenue({}, "tangiers"),
       shishka: normalizeVenue({}, "shishka"),
@@ -617,6 +618,7 @@ function unpackDb(raw) {
   const next = {
     current: VENUES[raw.current] ? raw.current : "tangiers",
     updatedAt: Number(raw.updatedAt || 0),
+    removedStaff: raw.removedStaff || {},
     venues: {
       tangiers: normalizeVenue(raw.venues.tangiers, "tangiers"),
       shishka: normalizeVenue(raw.venues.shishka, "shishka"),
@@ -631,6 +633,7 @@ function packedDb() {
     app: "comfort-journal",
     updatedAt: Number(db.updatedAt || 0),
     current: db.current,
+    removedStaff: db.removedStaff || {},
     venues: db.venues,
   };
 }
@@ -723,30 +726,49 @@ function mergeExtras(older = {}, newer = {}) {
   return out;
 }
 
-function mergeEmployees(older = [], newer = []) {
+function mergeRemovedStaff(a = {}, b = {}) {
+  const out = { ...(a || {}) };
+  Object.entries(b || {}).forEach(([key, row]) => {
+    if (!row) return;
+    const prev = out[key];
+    if (!prev || Number(row.at || 0) >= Number(prev.at || 0)) out[key] = row;
+  });
+  return out;
+}
+
+function stampRemoved(emp, removed = {}) {
+  const key = normalizeName(emp?.name);
+  const gone = key && removed[key];
+  if (!gone) return emp;
+  if (emp.leftOn) return emp;
+  return { ...emp, leftOn: gone.leftOn || "" };
+}
+
+function mergeEmployees(older = [], newer = [], removed = {}) {
   const byName = new Map();
   [...older, ...newer].forEach((emp) => {
     if (!emp || isPlaceholderEmployee(emp)) return;
     const key = normalizeName(emp.name);
     if (!key) return;
+    const row = stampRemoved({ ...emp }, removed);
     const prev = byName.get(key);
     if (!prev) {
-      byName.set(key, { ...emp });
+      byName.set(key, row);
       return;
     }
-    if (emp.id && !prev.id) prev.id = emp.id;
-    if (emp.leftOn && (!prev.leftOn || emp.leftOn < prev.leftOn)) prev.leftOn = emp.leftOn;
+    if (row.id && !prev.id) prev.id = row.id;
+    if (row.leftOn && (!prev.leftOn || row.leftOn < prev.leftOn)) prev.leftOn = row.leftOn;
   });
   return [...byName.values()];
 }
 
-function mergeVenue(older, newer) {
+function mergeVenue(older, newer, removed = {}) {
   if (!older) return newer;
   if (!newer) return older;
   return {
     ...older,
     ...newer,
-    employees: mergeEmployees(older.employees, newer.employees),
+    employees: mergeEmployees(older.employees, newer.employees, removed),
     schedule: mergeSchedule(older.schedule, newer.schedule),
     scheduleAt: Math.max(Number(older.scheduleAt || 0), Number(newer.scheduleAt || 0)),
     extras: mergeExtras(older.extras, newer.extras),
@@ -769,13 +791,15 @@ function mergePacked(local, incoming) {
   const localNewer = Number(local.updatedAt || 0) >= Number(incoming.updatedAt || 0);
   const older = localNewer ? incoming : local;
   const newer = localNewer ? local : incoming;
+  const removedStaff = mergeRemovedStaff(local.removedStaff, incoming.removedStaff);
   return {
     app: "comfort-journal",
     updatedAt: Math.max(Number(local.updatedAt || 0), Number(incoming.updatedAt || 0)),
     current: local.current,
+    removedStaff,
     venues: {
-      tangiers: mergeVenue(older.venues?.tangiers, newer.venues?.tangiers),
-      shishka: mergeVenue(older.venues?.shishka, newer.venues?.shishka),
+      tangiers: mergeVenue(older.venues?.tangiers, newer.venues?.tangiers, removedStaff),
+      shishka: mergeVenue(older.venues?.shishka, newer.venues?.shishka, removedStaff),
     },
   };
 }
@@ -791,6 +815,7 @@ function applyCloud(raw) {
   const next = unpackDb(raw);
   db.current = VENUES[keep] ? keep : next.current;
   db.updatedAt = next.updatedAt;
+  db.removedStaff = next.removedStaff || {};
   db.venues = next.venues;
   state = db.venues[db.current];
 }
@@ -1268,6 +1293,10 @@ function shareStaffIn(root = db) {
       return;
     }
     if (emp.leftOn && (!prev.leftOn || emp.leftOn < prev.leftOn)) prev.leftOn = emp.leftOn;
+  });
+  const removed = root.removedStaff || {};
+  byName.forEach((emp, key) => {
+    if (removed[key] && !emp.leftOn) emp.leftOn = removed[key].leftOn || "";
   });
   const merged = [...byName.values()];
   const nameToId = new Map(merged.map((emp) => [normalizeName(emp.name), emp.id]));
@@ -3493,6 +3522,12 @@ $("#timesheetVenues")?.addEventListener("click", (e) => {
     const people = sharedEmployees();
     const emp = people.find((row) => row.id === del.dataset.delEmp);
     if (!emp || !window.confirm(`Убрать ${emp.name} из табеля обоих филиалов?`)) return;
+    if (!db.removedStaff) db.removedStaff = {};
+    db.removedStaff[normalizeName(emp.name)] = {
+      at: Date.now(),
+      leftOn: emp.leftOn || todayISO(),
+      id: emp.id,
+    };
     if (emp.leftOn || isPlaceholderEmployee(emp)) {
       setSharedEmployees(people.filter((row) => row.id !== emp.id));
     } else {
@@ -3552,6 +3587,7 @@ $("#addEmployeeForm").addEventListener("submit", (e) => {
   if (existing) {
     if (existing.leftOn) {
       existing.leftOn = "";
+      if (db.removedStaff) delete db.removedStaff[normalizeName(name)];
       save();
       e.target.reset();
       renderShifts();
